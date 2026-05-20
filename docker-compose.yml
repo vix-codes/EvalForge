@@ -140,3 +140,8 @@ services:
       - "127.0.0.1:3090:80"
     depends_on:
       - api
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
