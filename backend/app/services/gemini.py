@@ -96,10 +96,12 @@ def get_gemini_judge() -> GeminiJudge:
 
 
 CLASSIFY_PROMPT = """\
-Classify this maintenance complaint. Respond with EXACTLY two lines, nothing else.
+Classify this maintenance complaint. Reply with EXACTLY two words on one line, nothing else.
 
-CATEGORY: <one of: PLUMBING, ELECTRICAL, SECURITY, CLEANING, INTERNET, HVAC, STRUCTURAL, GENERAL>
-PRIORITY: <one of: LOW, MEDIUM, HIGH, CRITICAL>
+Format: CATEGORY PRIORITY
+
+Categories: PLUMBING, ELECTRICAL, SECURITY, CLEANING, INTERNET, HVAC, STRUCTURAL, GENERAL
+Priorities: LOW, MEDIUM, HIGH, CRITICAL
 
 Complaint: {complaint}"""
 
@@ -120,7 +122,7 @@ class GeminiClassifier:
         url = GEMINI_API_URL.format(model=self.model)
         payload = {
             "contents": [{"parts": [{"text": CLASSIFY_PROMPT.format(complaint=complaint)}]}],
-            "generationConfig": {"temperature": 0.0, "maxOutputTokens": 64},
+            "generationConfig": {"temperature": 0.0, "maxOutputTokens": 256},
         }
 
         try:
