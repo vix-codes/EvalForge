@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.logging import get_logger
 from app.db.models import EvalResult, EvalRun, EvalSuite, GoldenQuestion
 from app.services.ollama import OllamaAdapter, OllamaError, get_ollama_adapter
+from app.services.resolvehub_eval import ResolvehubEvalError, get_resolvehub_adapter, score_categorization
 from app.services.scoring import score_response
 
 logger = get_logger(__name__)
@@ -51,21 +52,34 @@ async def execute_evaluation_run(
         question_count=len(questions),
     )
 
-    adapter = get_ollama_adapter()
     pipeline_start = time.perf_counter()
     results: list[EvalResult] = []
     latencies: list[float] = []
 
-    for question in questions:
-        result_obj = await _evaluate_question(
-            run=run,
-            question=question,
-            adapter=adapter,
-            session=session,
-        )
-        results.append(result_obj)
-        if result_obj.latency_ms is not None:
-            latencies.append(result_obj.latency_ms)
+    if run.model_provider == "resolvehub":
+        resolvehub_adapter = get_resolvehub_adapter()
+        for question in questions:
+            result_obj = await _evaluate_resolvehub_question(
+                run=run,
+                question=question,
+                adapter=resolvehub_adapter,
+                session=session,
+            )
+            results.append(result_obj)
+            if result_obj.latency_ms is not None:
+                latencies.append(result_obj.latency_ms)
+    else:
+        adapter = get_ollama_adapter()
+        for question in questions:
+            result_obj = await _evaluate_question(
+                run=run,
+                question=question,
+                adapter=adapter,
+                session=session,
+            )
+            results.append(result_obj)
+            if result_obj.latency_ms is not None:
+                latencies.append(result_obj.latency_ms)
 
     total_runtime_ms = (time.perf_counter() - pipeline_start) * 1000
 
@@ -134,6 +148,76 @@ async def _evaluate_question(
     except Exception as exc:
         logger.error(
             "evaluation.question.unexpected_error",
+            question_id=str(question.id),
+            error=str(exc),
+        )
+        result.error = str(exc)
+        result.passed = False
+        result.failure_reason = "unexpected_error"
+
+    await session.flush()
+    return result
+
+
+async def _evaluate_resolvehub_question(
+    run: EvalRun,
+    question: GoldenQuestion,
+    adapter,
+    session: AsyncSession,
+) -> EvalResult:
+    result = EvalResult(
+        run_id=run.id,
+        question_id=question.id,
+    )
+    session.add(result)
+
+    try:
+        categorization = await adapter.categorize(question.question)
+
+        result.model_response = (
+            f"CATEGORY: {categorization.category}\n"
+            f"PRIORITY: {categorization.priority}\n"
+            f"CONFIDENCE: {categorization.confidence:.3f}\n"
+            f"SUMMARY: {categorization.summary}"
+        )
+        result.latency_ms = categorization.latency_ms
+
+        scoring = score_categorization(
+            result=categorization,
+            expected_category=question.golden_answer,
+            expected_priority=question.category,
+        )
+
+        result.similarity_score = scoring["similarity_score"]
+        result.keyword_coverage = scoring["keyword_coverage"]
+        result.final_score = scoring["final_score"]
+        result.passed = scoring["passed"]
+        result.is_hallucination = scoring["is_hallucination"]
+        result.failure_reason = scoring["failure_reason"]
+        result.scoring_metadata = {
+            "provider": "resolvehub",
+            "category_match": scoring["category_match"],
+            "priority_match": scoring["priority_match"],
+            "priority_within_one": scoring["priority_within_one"],
+            "confidence_ok": scoring["confidence_ok"],
+            "actual": scoring["actual"],
+        }
+
+    except ResolvehubEvalError as exc:
+        logger.error(
+            "evaluation.resolvehub.api_error",
+            question_id=str(question.id),
+            status_code=exc.status_code,
+            error=str(exc),
+        )
+        result.error = str(exc)
+        result.passed = False
+        result.is_hallucination = False
+        result.failure_reason = "resolvehub_api_error"
+
+    except Exception as exc:
+        logger.error(
+            "evaluation.resolvehub.unexpected_error",
             question_id=str(question.id),
             error=str(exc),
         )

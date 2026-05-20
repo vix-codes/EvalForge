@@ -4,6 +4,9 @@ networks:
   evalforge_net:
     driver: bridge
     name: evalforge_net
+  services-net:
+    external: true
+    name: services-net
 
 volumes:
   evalforge_postgres_data:
@@ -71,6 +74,9 @@ services:
       MAX_HALLUCINATION_RATE: ${MAX_HALLUCINATION_RATE:-0.15}
       MAX_P95_LATENCY_MS: ${MAX_P95_LATENCY_MS:-10000.0}
       MIN_PASS_RATE: ${MIN_PASS_RATE:-0.80}
+      DOCKOPS_WEBHOOK_SECRET: ${DOCKOPS_WEBHOOK_SECRET:-}
+      RESOLVEHUB_API_URL: ${RESOLVEHUB_API_URL:-http://resolvehub-backend:5000}
+      RESOLVEHUB_EVAL_SECRET: ${RESOLVEHUB_EVAL_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,6 +84,7 @@ services:
         condition: service_healthy
     networks:
       - evalforge_net
+      - services-net
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -106,6 +113,8 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-production}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_JUDGE_ENABLED: ${GEMINI_JUDGE_ENABLED:-false}
+      RESOLVEHUB_API_URL: ${RESOLVEHUB_API_URL:-http://resolvehub-backend:5000}
+      RESOLVEHUB_EVAL_SECRET: ${RESOLVEHUB_EVAL_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,6 +122,7 @@ services:
         condition: service_healthy
     networks:
       - evalforge_net
+      - services-net
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

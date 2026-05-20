@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     GITHUB_WEBHOOK_SECRET: str = ""
     GITHUB_TOKEN: str = ""
 
+    # DockOps Integration
+    DOCKOPS_WEBHOOK_SECRET: str = ""
+
+    # ResolveHub Integration
+    RESOLVEHUB_API_URL: str = "http://resolvehub-backend:5000"
+    RESOLVEHUB_EVAL_SECRET: str = ""
+    RESOLVEHUB_EVAL_TIMEOUT: float = 15.0
+
     # Quality Gates
     MAX_HALLUCINATION_RATE: float = 0.15
     MAX_P95_LATENCY_MS: float = 10000.0

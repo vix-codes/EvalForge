@@ -1,0 +1,190 @@
+{
+  "suite": {
+    "name": "ResolveHub AI Categorization Suite",
+    "description": "Golden dataset for evaluating ResolveHub Gemini AI complaint categorization accuracy",
+    "version": "1.0.0",
+    "tags": "resolvehub,categorization,gemini,production"
+  },
+  "questions": [
+    {
+      "question": "There is water dripping from the bathroom ceiling and the floor is flooded. This started this morning and is getting worse.",
+      "golden_answer": "PLUMBING",
+      "category": "HIGH",
+      "expected_keywords": "PLUMBING,HIGH",
+      "difficulty": "easy",
+      "weight": 1.0,
+      "order_index": 1
+    },
+    {
+      "question": "The water pipe under my kitchen sink is leaking slowly. Small drips onto the cabinet floor.",
+      "golden_answer": "PLUMBING",
+      "category": "MEDIUM",
+      "expected_keywords": "PLUMBING,MEDIUM",
+      "difficulty": "easy",
+      "weight": 1.0,
+      "order_index": 2
+    },
+    {
+      "question": "My toilet has been running constantly for two days and will not stop. Wasting a lot of water.",
+      "golden_answer": "PLUMBING",
+      "category": "MEDIUM",
+      "expected_keywords": "PLUMBING,MEDIUM",
+      "difficulty": "easy",
+      "weight": 1.0,
+      "order_index": 3
+    },
+    {
+      "question": "Sparks are coming from the electrical outlet near my bathroom. There is a burning smell and I am worried about fire.",
+      "golden_answer": "ELECTRICAL",
+      "category": "CRITICAL",
+      "expected_keywords": "ELECTRICAL,CRITICAL",
+      "difficulty": "easy",
+      "weight": 2.0,
+      "order_index": 4
+    },
+    {
+      "question": "The fuse box in my apartment keeps tripping. Lights go out every few hours. Burning smell from the panel.",
+      "golden_answer": "ELECTRICAL",
+      "category": "CRITICAL",
+      "expected_keywords": "ELECTRICAL,CRITICAL",
+      "difficulty": "easy",
+      "weight": 2.0,
+      "order_index": 5
+    },
+    {
+      "question": "One light switch in the bedroom does not work. The bulb is fine but the switch feels loose.",
+      "golden_answer": "ELECTRICAL",
+      "category": "LOW",
+      "expected_keywords": "ELECTRICAL,LOW",
+      "difficulty": "medium",
+      "weight": 1.0,
+      "order_index": 6
+    },
+    {
+      "question": "My front door lock is broken and does not latch properly. Anyone could open it from outside.",
+      "golden_answer": "SECURITY",
+      "category": "HIGH",
+      "expected_keywords": "SECURITY,HIGH",
+      "difficulty": "easy",
+      "weight": 1.5,
+      "order_index": 7
+    },
+    {
+      "question": "I saw a stranger in the hallway who appeared to be trying to open my neighbour's door. Suspicious activity.",
+      "golden_answer": "SECURITY",
+      "category": "HIGH",
+      "expected_keywords": "SECURITY,HIGH",
+      "difficulty": "medium",
+      "weight": 1.5,
+      "order_index": 8
+    },
+    {
+      "question": "The common area hallway lights are all out. It is completely dark at night and feels unsafe.",
+      "golden_answer": "SECURITY",
+      "category": "MEDIUM",
+      "expected_keywords": "SECURITY,MEDIUM",
+      "difficulty": "medium",
+      "weight": 1.0,
+      "order_index": 9
+    },
+    {
+      "question": "There is garbage and dirt in the hallway outside my apartment that has not been cleaned in weeks. Strong smell.",
+      "golden_answer": "CLEANING",
+      "category": "MEDIUM",
+      "expected_keywords": "CLEANING,MEDIUM",
+      "difficulty": "easy",
+      "weight": 1.0,
+      "order_index": 10
+    },
+    {
+      "question": "Pest infestation — cockroaches visible in kitchen. Needs professional extermination immediately.",
+      "golden_answer": "CLEANING",
+      "category": "HIGH",
+      "expected_keywords": "CLEANING,HIGH",
+      "difficulty": "medium",
+      "weight": 1.0,
+      "order_index": 11
+    },
+    {
+      "question": "My internet has been down for three days. I work from home and this is urgent. Router shows no connection.",
+      "golden_answer": "INTERNET",
+      "category": "HIGH",
+      "expected_keywords": "INTERNET,HIGH",
+      "difficulty": "easy",
+      "weight": 1.0,
+      "order_index": 12
+    },
+    {
+      "question": "WiFi is very slow in my apartment. Streaming videos keeps buffering. Speed tests show 2 Mbps.",
+      "golden_answer": "INTERNET",
+      "category": "MEDIUM",
+      "expected_keywords": "INTERNET,MEDIUM",
+      "difficulty": "easy",
+      "weight": 1.0,
+      "order_index": 13
+    },
+    {
+      "question": "The air conditioning is not working. Temperature inside is 32 degrees Celsius and rising. I have elderly family members.",
+      "golden_answer": "HVAC",
+      "category": "HIGH",
+      "expected_keywords": "HVAC,HIGH",
+      "difficulty": "easy",
+      "weight": 1.5,
+      "order_index": 14
+    },
+    {
+      "question": "The heating system is making loud banging noises at night. Hot water radiators keep clanking and disturb sleep.",
+      "golden_answer": "HVAC",
+      "category": "MEDIUM",
+      "expected_keywords": "HVAC,MEDIUM",
+      "difficulty": "medium",
+      "weight": 1.0,
+      "order_index": 15
+    },
+    {
+      "question": "There is a large crack appearing in my bedroom wall. It was not there last month and seems to be growing.",
+      "golden_answer": "STRUCTURAL",
+      "category": "HIGH",
+      "expected_keywords": "STRUCTURAL,HIGH",
+      "difficulty": "medium",
+      "weight": 1.5,
+      "order_index": 16
+    },
+    {
+      "question": "The ceiling in my living room has a visible sag and some tiles have fallen. Looks like water damage weakened the structure.",
+      "golden_answer": "STRUCTURAL",
+      "category": "CRITICAL",
+      "expected_keywords": "STRUCTURAL,CRITICAL",
+      "difficulty": "medium",
+      "weight": 2.0,
+      "order_index": 17
+    },
+    {
+      "question": "I have a general question about apartment rules regarding parking in the guest spaces on weekends.",
+      "golden_answer": "GENERAL",
+      "category": "LOW",
+      "expected_keywords": "GENERAL,LOW",
+      "difficulty": "easy",
+      "weight": 0.5,
+      "order_index": 18
+    },
+    {
+      "question": "Water is leaking from the bathroom ceiling AND sparks are coming from the nearby power outlet. Possible electrical hazard near water source.",
+      "golden_answer": "ELECTRICAL",
+      "category": "CRITICAL",
+      "expected_keywords": "ELECTRICAL,CRITICAL",
+      "difficulty": "hard",
+      "weight": 2.0,
+      "order_index": 19
+    },
+    {
+      "question": "The kitchen tap drips very slowly. Not a big issue but has been going for about a month.",
+      "golden_answer": "PLUMBING",
+      "category": "LOW",
+      "expected_keywords": "PLUMBING,LOW",
+      "difficulty": "easy",
+      "weight": 0.8,
+      "order_index": 20
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session
@@ -9,6 +10,15 @@ from app.db.models import EvalRun, EvalSuite
 from app.schemas.webhook import GitHubPushPayload, WebhookTriggerResponse
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+
+
+class DockOpsDeploymentPayload(BaseModel):
+    deployment_id: str
+    project_name: str
+    commit_sha: str = "unknown"
+    commit_branch: str = "main"
+    status: str
+    timestamp: str | None = None
 logger = get_logger(__name__)
 
 
@@ -82,4 +92,93 @@ async def github_webhook(
         received=True,
         eval_run_id=str(run.id),
         message=f"Evaluation triggered for commit {payload.after[:8] if payload.after else 'unknown'}",
+    )
+
+
+@router.post("/dockops", response_model=WebhookTriggerResponse)
+async def dockops_webhook(
+    payload: DockOpsDeploymentPayload,
+    x_dockops_secret: str | None = Header(None),
+    session: AsyncSession = Depends(get_session),
+) -> WebhookTriggerResponse:
+    if settings.DOCKOPS_WEBHOOK_SECRET:
+        if x_dockops_secret != settings.DOCKOPS_WEBHOOK_SECRET:
+            raise HTTPException(status_code=401, detail="Invalid DockOps webhook secret")
+
+    if payload.status != "SUCCESS":
+        logger.info(
+            "webhook.dockops.skipped",
+            project=payload.project_name,
+            status=payload.status,
+            deployment_id=payload.deployment_id,
+        )
+        return WebhookTriggerResponse(
+            received=True,
+            message=f"Deployment {payload.status} — evaluation only runs on SUCCESS",
+        )
+
+    project_lower = payload.project_name.lower()
+    if "resolvehub" not in project_lower:
+        logger.info(
+            "webhook.dockops.not_resolvehub",
+            project=payload.project_name,
+        )
+        return WebhookTriggerResponse(
+            received=True,
+            message=f"Project '{payload.project_name}' is not monitored by EvalForge",
+        )
+
+    from sqlalchemy import select
+
+    stmt = (
+        select(EvalSuite)
+        .where(EvalSuite.is_active == True)
+        .where(EvalSuite.tags.ilike("%resolvehub%"))
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    suite = result.scalar_one_or_none()
+
+    if not suite:
+        stmt = select(EvalSuite).where(EvalSuite.is_active == True).limit(1)
+        result = await session.execute(stmt)
+        suite = result.scalar_one_or_none()
+
+    if not suite:
+        logger.warning("webhook.dockops.no_active_suite", project=payload.project_name)
+        return WebhookTriggerResponse(
+            received=True,
+            message="No active eval suite found — skipping evaluation",
+        )
+
+    run = EvalRun(
+        suite_id=suite.id,
+        model_name="resolvehub-gemini",
+        model_provider="resolvehub",
+        trigger="github_push",
+        commit_sha=payload.commit_sha,
+        commit_branch=payload.commit_branch,
+        commit_message=f"DockOps deployment {payload.deployment_id}",
+        github_repo=f"dockops/{payload.project_name}",
+    )
+    session.add(run)
+    await session.flush()
+
+    from app.workers.tasks import run_evaluation_task
+    task = run_evaluation_task.delay(str(run.id))
+    run.celery_task_id = task.id
+    await session.flush()
+
+    logger.info(
+        "webhook.dockops.eval_triggered",
+        run_id=str(run.id),
+        project=payload.project_name,
+        deployment_id=payload.deployment_id,
+        commit=payload.commit_sha,
+    )
+
+    return WebhookTriggerResponse(
+        received=True,
+        eval_run_id=str(run.id),
+        message=f"ResolveHub evaluation triggered for deployment {payload.deployment_id[:8]}",
     )
