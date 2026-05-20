@@ -1,0 +1,166 @@
+name: EvalForge Quality Gate
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+env:
+  EVALFORGE_API_URL: ${{ secrets.EVALFORGE_API_URL }}
+  EVALFORGE_SUITE_ID: ${{ secrets.EVALFORGE_SUITE_ID }}
+  EVALFORGE_MODEL: ${{ secrets.EVALFORGE_MODEL || 'phi4' }}
+  MAX_HALLUCINATION_RATE: ${{ secrets.MAX_HALLUCINATION_RATE || '0.15' }}
+  MIN_PASS_RATE: ${{ secrets.MIN_PASS_RATE || '0.80' }}
+  MAX_P95_LATENCY_MS: ${{ secrets.MAX_P95_LATENCY_MS || '10000' }}
+
+jobs:
+  eval-quality-gate:
+    name: LLM Evaluation Quality Gate
+    runs-on: ubuntu-latest
+    if: ${{ vars.EVALFORGE_ENABLED == 'true' || secrets.EVALFORGE_API_URL != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install httpx
+
+      - name: Trigger evaluation run
+        id: trigger
+        run: |
+          python - <<'EOF'
+          import httpx
+          import json
+          import os
+          import sys
+
+          api_url = os.environ.get("EVALFORGE_API_URL", "").rstrip("/")
+          suite_id = os.environ.get("EVALFORGE_SUITE_ID", "")
+          model = os.environ.get("EVALFORGE_MODEL", "phi4")
+
+          if not api_url or not suite_id:
+              print("::warning::EVALFORGE_API_URL or EVALFORGE_SUITE_ID not configured. Skipping eval gate.")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("run_id=skip\n")
+              sys.exit(0)
+
+          payload = {"suite_id": suite_id, "model_name": model, "trigger": "github_actions"}
+          resp = httpx.post(f"{api_url}/api/v1/evals", json=payload, timeout=30)
+          resp.raise_for_status()
+          run = resp.json()
+          run_id = run["id"]
+          print(f"Evaluation run triggered: {run_id}")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"run_id={run_id}\n")
+          EOF
+
+      - name: Wait for evaluation to complete
+        id: wait
+        if: steps.trigger.outputs.run_id != 'skip'
+        run: |
+          python - <<'EOF'
+          import httpx
+          import json
+          import os
+          import sys
+          import time
+
+          api_url = os.environ.get("EVALFORGE_API_URL", "").rstrip("/")
+          run_id = os.environ.get("RUN_ID")
+
+          if not run_id or run_id == "skip":
+              sys.exit(0)
+
+          max_wait = 600  # 10 minutes
+          poll_interval = 15
+          elapsed = 0
+
+          while elapsed < max_wait:
+              resp = httpx.get(f"{api_url}/api/v1/evals/{run_id}", timeout=15)
+              resp.raise_for_status()
+              run = resp.json()
+              status = run["status"]
+              print(f"[{elapsed}s] Status: {status}")
+
+              if status == "completed":
+                  with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                      f.write(f"pass_rate={run.get('pass_rate', 0)}\n")
+                      f.write(f"hallucination_rate={run.get('hallucination_rate', 0)}\n")
+                      f.write(f"p95_latency_ms={run.get('p95_latency_ms', 0)}\n")
+                      f.write(f"quality_gate_passed={run.get('quality_gate_passed', False)}\n")
+                  with open("eval_results.json", "w") as f:
+                      json.dump(run, f, indent=2)
+                  sys.exit(0)
+              elif status == "failed":
+                  print(f"::error::Evaluation run failed: {run.get('error_message', 'Unknown error')}")
+                  sys.exit(1)
+
+              time.sleep(poll_interval)
+              elapsed += poll_interval
+
+          print("::error::Evaluation timed out after 10 minutes")
+          sys.exit(1)
+        env:
+          RUN_ID: ${{ steps.trigger.outputs.run_id }}
+
+      - name: Evaluate quality gate
+        id: gate
+        if: steps.trigger.outputs.run_id != 'skip'
+        run: |
+          python - <<'EOF'
+          import json
+          import os
+          import sys
+
+          pass_rate = float(os.environ.get("PASS_RATE", "0"))
+          hallucination_rate = float(os.environ.get("HALLUCINATION_RATE", "0"))
+          p95_latency = float(os.environ.get("P95_LATENCY_MS", "0"))
+          quality_gate_passed = os.environ.get("QUALITY_GATE_PASSED", "False").lower() == "true"
+
+          max_hallucination = float(os.environ.get("MAX_HALLUCINATION_RATE", "0.15"))
+          min_pass_rate = float(os.environ.get("MIN_PASS_RATE", "0.80"))
+          max_p95 = float(os.environ.get("MAX_P95_LATENCY_MS", "10000"))
+
+          print("=" * 60)
+          print("EVALFORGE QUALITY GATE RESULTS")
+          print("=" * 60)
+          print(f"Pass Rate:          {pass_rate*100:.1f}% (min: {min_pass_rate*100:.1f}%) {'✓' if pass_rate >= min_pass_rate else '✗'}")
+          print(f"Hallucination Rate: {hallucination_rate*100:.1f}% (max: {max_hallucination*100:.1f}%) {'✓' if hallucination_rate <= max_hallucination else '✗'}")
+          print(f"P95 Latency:        {p95_latency:.0f}ms (max: {max_p95:.0f}ms) {'✓' if p95_latency <= max_p95 else '✗'}")
+          print(f"Gate Decision:      {'PASS' if quality_gate_passed else 'FAIL'}")
+          print("=" * 60)
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write("## EvalForge Quality Gate Report\n\n")
+              f.write("| Metric | Value | Threshold | Status |\n")
+              f.write("|--------|-------|-----------|--------|\n")
+              f.write(f"| Pass Rate | {pass_rate*100:.1f}% | ≥{min_pass_rate*100:.1f}% | {'✅' if pass_rate >= min_pass_rate else '❌'} |\n")
+              f.write(f"| Hallucination Rate | {hallucination_rate*100:.1f}% | ≤{max_hallucination*100:.1f}% | {'✅' if hallucination_rate <= max_hallucination else '❌'} |\n")
+              f.write(f"| P95 Latency | {p95_latency:.0f}ms | ≤{max_p95:.0f}ms | {'✅' if p95_latency <= max_p95 else '❌'} |\n")
+              f.write(f"\n**Gate Decision: {'✅ PASS' if quality_gate_passed else '❌ FAIL — merge blocked'}**\n")
+
+          if not quality_gate_passed:
+              print("::error::Quality gate FAILED — merge blocked due to LLM regression")
+              sys.exit(1)
+          EOF
+        env:
+          PASS_RATE: ${{ steps.wait.outputs.pass_rate }}
+          HALLUCINATION_RATE: ${{ steps.wait.outputs.hallucination_rate }}
+          P95_LATENCY_MS: ${{ steps.wait.outputs.p95_latency_ms }}
+          QUALITY_GATE_PASSED: ${{ steps.wait.outputs.quality_gate_passed }}
+
+      - name: Upload eval artifacts
+        if: always() && steps.trigger.outputs.run_id != 'skip'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ github.sha }}
+          path: eval_results.json
+          retention-days: 30

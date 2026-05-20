@@ -1,0 +1,132 @@
+version: "3.9"
+
+networks:
+  evalforge_net:
+    driver: bridge
+    name: evalforge_net
+
+volumes:
+  evalforge_postgres_data:
+    name: evalforge_postgres_data
+  evalforge_redis_data:
+    name: evalforge_redis_data
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: evalforge_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: evalforge
+      POSTGRES_USER: evalforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-evalforge_secure_pass}
+    volumes:
+      - evalforge_postgres_data:/var/lib/postgresql/data
+    networks:
+      - evalforge_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evalforge -d evalforge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "127.0.0.1:5434:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: evalforge_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - evalforge_redis_data:/data
+    networks:
+      - evalforge_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "127.0.0.1:6381:6379"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: evalforge_api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://evalforge:${POSTGRES_PASSWORD:-evalforge_secure_pass}@postgres:5432/evalforge
+      REDIS_URL: redis://redis:6379/0
+      REDIS_CELERY_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      SECRET_KEY: ${SECRET_KEY:-changeme-use-strong-key-in-production-32chars}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_JUDGE_ENABLED: ${GEMINI_JUDGE_ENABLED:-false}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      MAX_HALLUCINATION_RATE: ${MAX_HALLUCINATION_RATE:-0.15}
+      MAX_P95_LATENCY_MS: ${MAX_P95_LATENCY_MS:-10000.0}
+      MIN_PASS_RATE: ${MIN_PASS_RATE:-0.80}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - evalforge_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8765:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: evalforge_worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://evalforge:${POSTGRES_PASSWORD:-evalforge_secure_pass}@postgres:5432/evalforge
+      REDIS_URL: redis://redis:6379/0
+      REDIS_CELERY_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      SECRET_KEY: ${SECRET_KEY:-changeme-use-strong-key-in-production-32chars}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_JUDGE_ENABLED: ${GEMINI_JUDGE_ENABLED:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - evalforge_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api/v1}
+    container_name: evalforge_frontend
+    restart: unless-stopped
+    networks:
+      - evalforge_net
+    ports:
+      - "127.0.0.1:3090:80"
+    depends_on:
+      - api

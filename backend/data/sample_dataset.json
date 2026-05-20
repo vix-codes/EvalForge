@@ -1,0 +1,100 @@
+{
+  "suite": {
+    "name": "General Knowledge Eval Suite v1",
+    "description": "Baseline golden dataset for LLM quality evaluation",
+    "version": "1.0.0",
+    "tags": "general,knowledge,baseline"
+  },
+  "questions": [
+    {
+      "question": "What is the capital of France?",
+      "golden_answer": "The capital of France is Paris. It is the country's largest city and serves as its political, economic, and cultural center.",
+      "category": "geography",
+      "difficulty": "easy",
+      "expected_keywords": "Paris,capital,France",
+      "weight": 1.0,
+      "order_index": 0
+    },
+    {
+      "question": "Explain what machine learning is in simple terms.",
+      "golden_answer": "Machine learning is a type of artificial intelligence where computer systems learn from data to improve their performance over time without being explicitly programmed. Instead of following rigid rules, ML models find patterns in data and use those patterns to make predictions or decisions.",
+      "category": "ai_concepts",
+      "difficulty": "medium",
+      "expected_keywords": "machine learning,data,patterns,artificial intelligence,learn",
+      "weight": 1.5,
+      "order_index": 1
+    },
+    {
+      "question": "What is the difference between supervised and unsupervised learning?",
+      "golden_answer": "Supervised learning uses labeled training data where the correct answers are provided, allowing the model to learn from examples. Unsupervised learning works with unlabeled data, finding hidden patterns and structures without predefined answers. Examples: supervised includes classification and regression, unsupervised includes clustering and dimensionality reduction.",
+      "category": "ai_concepts",
+      "difficulty": "medium",
+      "expected_keywords": "supervised,unsupervised,labeled,unlabeled,patterns,clustering",
+      "weight": 2.0,
+      "order_index": 2
+    },
+    {
+      "question": "What is a REST API?",
+      "golden_answer": "A REST API (Representational State Transfer Application Programming Interface) is a web service that follows REST architectural constraints. It uses HTTP methods (GET, POST, PUT, DELETE) to perform operations on resources identified by URLs. REST APIs are stateless, meaning each request contains all the information needed to process it.",
+      "category": "software_engineering",
+      "difficulty": "easy",
+      "expected_keywords": "REST,API,HTTP,stateless,resources,GET,POST",
+      "weight": 1.0,
+      "order_index": 3
+    },
+    {
+      "question": "Describe the CAP theorem in distributed systems.",
+      "golden_answer": "The CAP theorem states that a distributed system can only guarantee two of three properties simultaneously: Consistency (all nodes see the same data at the same time), Availability (every request receives a response), and Partition Tolerance (the system continues operating despite network partitions). Real-world systems must choose their trade-offs based on requirements.",
+      "category": "distributed_systems",
+      "difficulty": "hard",
+      "expected_keywords": "CAP,Consistency,Availability,Partition,distributed,trade-off",
+      "weight": 2.5,
+      "order_index": 4
+    },
+    {
+      "question": "What is Docker and why is it used?",
+      "golden_answer": "Docker is a containerization platform that packages applications and their dependencies into lightweight, isolated containers. It ensures consistency across different environments (development, staging, production), enables faster deployment, improves resource efficiency compared to virtual machines, and simplifies dependency management.",
+      "category": "devops",
+      "difficulty": "medium",
+      "expected_keywords": "Docker,container,containerization,deployment,environment,dependencies",
+      "weight": 1.5,
+      "order_index": 5
+    },
+    {
+      "question": "Explain the concept of a database index and when to use one.",
+      "golden_answer": "A database index is a data structure that improves the speed of data retrieval operations at the cost of additional storage and slower write operations. Indexes should be used on columns frequently used in WHERE clauses, JOIN conditions, or ORDER BY clauses. Avoid over-indexing as it degrades write performance.",
+      "category": "databases",
+      "difficulty": "medium",
+      "expected_keywords": "index,database,query,performance,retrieval,WHERE,JOIN",
+      "weight": 2.0,
+      "order_index": 6
+    },
+    {
+      "question": "What is the difference between SQL and NoSQL databases?",
+      "golden_answer": "SQL databases are relational, use structured schemas, and support ACID transactions — ideal for complex queries and structured data. NoSQL databases are non-relational, schema-flexible, and optimized for horizontal scaling and unstructured or semi-structured data. Examples: SQL includes PostgreSQL, MySQL; NoSQL includes MongoDB, Redis, Cassandra.",
+      "category": "databases",
+      "difficulty": "medium",
+      "expected_keywords": "SQL,NoSQL,relational,schema,ACID,scaling,structured",
+      "weight": 1.5,
+      "order_index": 7
+    },
+    {
+      "question": "What is async/await in Python?",
+      "golden_answer": "Async/await in Python is a syntax for writing asynchronous, non-blocking code. The 'async' keyword defines a coroutine function, and 'await' suspends execution of the coroutine until the awaited operation completes. This enables efficient I/O-bound concurrency without multi-threading, using Python's asyncio event loop.",
+      "category": "python",
+      "difficulty": "medium",
+      "expected_keywords": "async,await,asynchronous,coroutine,asyncio,non-blocking,event loop",
+      "weight": 2.0,
+      "order_index": 8
+    },
+    {
+      "question": "What is a transformer model in AI?",
+      "golden_answer": "A transformer is a deep learning architecture based on self-attention mechanisms, introduced in the 'Attention Is All You Need' paper (2017). It processes sequences in parallel rather than sequentially, making it highly efficient. Transformers are the foundation of modern large language models like GPT and BERT, excelling at NLP tasks including text generation, translation, and summarization.",
+      "category": "ai_concepts",
+      "difficulty": "hard",
+      "expected_keywords": "transformer,attention,self-attention,GPT,BERT,language model,NLP",
+      "weight": 2.5,
+      "order_index": 9
+    }
+  ]
+}
