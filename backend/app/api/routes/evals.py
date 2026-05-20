@@ -64,6 +64,7 @@ async def create_run(
     task = run_evaluation_task.delay(str(run.id))
     run.celery_task_id = task.id
     await session.flush()
+    await session.refresh(run)
 
     logger.info("eval.run.created", run_id=str(run.id), task_id=task.id)
     return EvalRunResponse.model_validate(run)

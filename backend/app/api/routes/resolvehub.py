@@ -108,6 +108,7 @@ async def trigger_resolvehub_eval(
     task = run_evaluation_task.delay(str(run.id))
     run.celery_task_id = task.id
     await session.flush()
+    await session.refresh(run)
 
     logger.info("resolvehub.eval.triggered", run_id=str(run.id), suite_id=str(suite.id))
     return EvalRunResponse.model_validate(run)
