@@ -108,10 +108,14 @@ class GeminiClassifier:
     def __init__(self, api_key: str | None = None) -> None:
         self.api_key = api_key or settings.GEMINI_API_KEY
         self.model = settings.GEMINI_MODEL
+        self._rpm_delay = 7.0  # 7s between calls → ~8 RPM, safely under 10 RPM free tier
 
     async def classify(self, complaint: str) -> tuple[str, float]:
         if not self.api_key:
             raise GeminiError("GEMINI_API_KEY is not configured")
+
+        import asyncio
+        await asyncio.sleep(self._rpm_delay)
 
         url = GEMINI_API_URL.format(model=self.model)
         payload = {
