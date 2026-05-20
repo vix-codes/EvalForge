@@ -68,6 +68,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:-changeme-use-strong-key-in-production-32chars}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
       GEMINI_JUDGE_ENABLED: ${GEMINI_JUDGE_ENABLED:-false}
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
@@ -112,6 +113,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:-changeme-use-strong-key-in-production-32chars}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
       GEMINI_JUDGE_ENABLED: ${GEMINI_JUDGE_ENABLED:-false}
       RESOLVEHUB_API_URL: ${RESOLVEHUB_API_URL:-http://resolvehub-backend:5000}
       RESOLVEHUB_EVAL_SECRET: ${RESOLVEHUB_EVAL_SECRET:-}
