@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.db.models import EvalResult, EvalRun, EvalSuite, GoldenQuestion
+from app.services.gemini import GeminiClassifier, GeminiError, get_gemini_classifier
 from app.services.ollama import OllamaAdapter, OllamaError, get_ollama_adapter
 from app.services.resolvehub_eval import ResolvehubEvalError, get_resolvehub_adapter, score_categorization
 from app.services.scoring import score_response
@@ -63,6 +64,18 @@ async def execute_evaluation_run(
                 run=run,
                 question=question,
                 adapter=resolvehub_adapter,
+                session=session,
+            )
+            results.append(result_obj)
+            if result_obj.latency_ms is not None:
+                latencies.append(result_obj.latency_ms)
+    elif run.model_provider == "gemini":
+        classifier = get_gemini_classifier()
+        for question in questions:
+            result_obj = await _evaluate_gemini_question(
+                run=run,
+                question=question,
+                classifier=classifier,
                 session=session,
             )
             results.append(result_obj)
@@ -151,6 +164,53 @@ async def _evaluate_question(
             question_id=str(question.id),
             error=str(exc),
         )
+        result.error = str(exc)
+        result.passed = False
+        result.failure_reason = "unexpected_error"
+
+    await session.flush()
+    return result
+
+
+async def _evaluate_gemini_question(
+    run: EvalRun,
+    question: GoldenQuestion,
+    classifier: GeminiClassifier,
+    session: AsyncSession,
+) -> EvalResult:
+    result = EvalResult(run_id=run.id, question_id=question.id)
+    session.add(result)
+
+    try:
+        response_text, latency_ms = await classifier.classify(question.question)
+        result.model_response = response_text
+        result.latency_ms = latency_ms
+
+        scoring = await score_response(
+            question=question.question,
+            golden_answer=question.golden_answer,
+            model_response=response_text,
+            expected_keywords=question.expected_keywords,
+        )
+        result.similarity_score = scoring.similarity_score
+        result.keyword_coverage = scoring.keyword_coverage
+        result.gemini_score = scoring.gemini_score
+        result.gemini_reasoning = scoring.gemini_reasoning
+        result.final_score = scoring.final_score
+        result.passed = scoring.passed
+        result.is_hallucination = scoring.is_hallucination
+        result.failure_reason = scoring.failure_reason
+        result.scoring_metadata = scoring.metadata
+
+    except GeminiError as exc:
+        logger.error("evaluation.gemini.error", question_id=str(question.id), error=str(exc))
+        result.error = str(exc)
+        result.passed = False
+        result.is_hallucination = False
+        result.failure_reason = "inference_error"
+
+    except Exception as exc:
+        logger.error("evaluation.gemini.unexpected_error", question_id=str(question.id), error=str(exc))
         result.error = str(exc)
         result.passed = False
         result.failure_reason = "unexpected_error"
