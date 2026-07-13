@@ -8,12 +8,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.db.models import EvalResult, EvalRun, EvalSuite, GoldenQuestion
-from app.services.gemini import GeminiClassifier, GeminiError, get_gemini_classifier
-from app.services.ollama import OllamaAdapter, OllamaError, get_ollama_adapter
-from app.services.resolvehub_eval import ResolvehubEvalError, get_resolvehub_adapter, score_categorization
+from app.services.gemini import GeminiError, GeminiJudge, get_gemini_judge
+from app.services.ollama import GenericLLMAdapter, OllamaError, get_ollama_adapter
 from app.services.scoring import score_response
 
 logger = get_logger(__name__)
+
+DEFAULT_SYSTEM_PROMPT = """\
+You are being evaluated by EvalForge.
+Answer the task directly and technically.
+Keep the response under 220 words unless code is explicitly required.
+If code is required, provide one concise snippet plus short notes.
+Explicitly mention deadlock or performance risks when relevant.
+Avoid introductions, disclaimers, and broad generic explanations.
+"""
 
 
 async def execute_evaluation_run(
@@ -50,6 +58,8 @@ async def execute_evaluation_run(
         "evaluation.run.started",
         run_id=str(run_id),
         model=run.model_name,
+        provider=run.model_provider,
+        endpoint=run.endpoint_url or settings.OLLAMA_BASE_URL,
         question_count=len(questions),
     )
 
@@ -57,37 +67,31 @@ async def execute_evaluation_run(
     results: list[EvalResult] = []
     latencies: list[float] = []
 
-    if run.model_provider == "resolvehub":
-        resolvehub_adapter = get_resolvehub_adapter()
-        for question in questions:
-            result_obj = await _evaluate_resolvehub_question(
-                run=run,
-                question=question,
-                adapter=resolvehub_adapter,
-                session=session,
-            )
-            results.append(result_obj)
-            if result_obj.latency_ms is not None:
-                latencies.append(result_obj.latency_ms)
-    elif run.model_provider == "gemini":
-        classifier = get_gemini_classifier()
+    # Resolve which system prompt to use for this run
+    system_prompt = run.system_prompt_override or DEFAULT_SYSTEM_PROMPT
+
+    if run.model_provider == "gemini":
+        # Use Gemini as the inference model (not just judge)
+        judge = get_gemini_judge()
         for question in questions:
             result_obj = await _evaluate_gemini_question(
                 run=run,
                 question=question,
-                classifier=classifier,
+                judge=judge,
                 session=session,
             )
             results.append(result_obj)
             if result_obj.latency_ms is not None:
                 latencies.append(result_obj.latency_ms)
     else:
-        adapter = get_ollama_adapter()
+        # Ollama-compatible endpoint: local or any deployed URL
+        adapter = get_ollama_adapter(base_url=run.endpoint_url)
         for question in questions:
             result_obj = await _evaluate_question(
                 run=run,
                 question=question,
                 adapter=adapter,
+                system_prompt=system_prompt,
                 session=session,
             )
             results.append(result_obj)
@@ -114,7 +118,8 @@ async def execute_evaluation_run(
 async def _evaluate_question(
     run: EvalRun,
     question: GoldenQuestion,
-    adapter: OllamaAdapter,
+    adapter: GenericLLMAdapter,
+    system_prompt: str,
     session: AsyncSession,
 ) -> EvalResult:
     result = EvalResult(
@@ -127,6 +132,8 @@ async def _evaluate_question(
         inference = await adapter.generate(
             prompt=question.question,
             model=run.model_name,
+            system_prompt=system_prompt,
+            # base_url is already baked into the adapter instance
         )
         result.model_response = inference.response
         result.latency_ms = inference.latency_ms
@@ -149,7 +156,7 @@ async def _evaluate_question(
 
     except OllamaError as exc:
         logger.error(
-            "evaluation.question.ollama_error",
+            "evaluation.question.llm_error",
             question_id=str(question.id),
             error=str(exc),
         )
@@ -175,16 +182,43 @@ async def _evaluate_question(
 async def _evaluate_gemini_question(
     run: EvalRun,
     question: GoldenQuestion,
-    classifier: GeminiClassifier,
+    judge: GeminiJudge,
     session: AsyncSession,
 ) -> EvalResult:
+    """Use Gemini as the inference model (not just as a judge)."""
     result = EvalResult(run_id=run.id, question_id=question.id)
     session.add(result)
 
     try:
-        response_text, latency_ms = await classifier.classify(question.question)
+        import time as _time
+        import httpx as _httpx
+        from app.core.config import settings as _settings
+
+        # Build a minimal Gemini generate request
+        GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        api_key = _settings.GEMINI_API_KEY
+        if not api_key:
+            raise GeminiError("GEMINI_API_KEY is not configured")
+
+        system_prompt = run.system_prompt_override or DEFAULT_SYSTEM_PROMPT
+        prompt_text = f"{system_prompt}\n\n{question.question}"
+
+        url = GEMINI_URL.format(model=_settings.GEMINI_MODEL)
+        payload = {
+            "contents": [{"parts": [{"text": prompt_text}]}],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 512},
+        }
+
+        t0 = _time.perf_counter()
+        async with _httpx.AsyncClient(timeout=60) as client:
+            response = await client.post(url, json=payload, params={"key": api_key})
+            latency_ms = (_time.perf_counter() - t0) * 1000
+            response.raise_for_status()
+            data = response.json()
+
+        response_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         result.model_response = response_text
-        result.latency_ms = latency_ms
+        result.latency_ms = round(latency_ms, 2)
 
         scoring = await score_response(
             question=question.question,
@@ -211,76 +245,6 @@ async def _evaluate_gemini_question(
 
     except Exception as exc:
         logger.error("evaluation.gemini.unexpected_error", question_id=str(question.id), error=str(exc))
-        result.error = str(exc)
-        result.passed = False
-        result.failure_reason = "unexpected_error"
-
-    await session.flush()
-    return result
-
-
-async def _evaluate_resolvehub_question(
-    run: EvalRun,
-    question: GoldenQuestion,
-    adapter,
-    session: AsyncSession,
-) -> EvalResult:
-    result = EvalResult(
-        run_id=run.id,
-        question_id=question.id,
-    )
-    session.add(result)
-
-    try:
-        categorization = await adapter.categorize(question.question)
-
-        result.model_response = (
-            f"CATEGORY: {categorization.category}\n"
-            f"PRIORITY: {categorization.priority}\n"
-            f"CONFIDENCE: {categorization.confidence:.3f}\n"
-            f"SUMMARY: {categorization.summary}"
-        )
-        result.latency_ms = categorization.latency_ms
-
-        scoring = score_categorization(
-            result=categorization,
-            expected_category=question.golden_answer,
-            expected_priority=question.category,
-        )
-
-        result.similarity_score = scoring["similarity_score"]
-        result.keyword_coverage = scoring["keyword_coverage"]
-        result.final_score = scoring["final_score"]
-        result.passed = scoring["passed"]
-        result.is_hallucination = scoring["is_hallucination"]
-        result.failure_reason = scoring["failure_reason"]
-        result.scoring_metadata = {
-            "provider": "resolvehub",
-            "category_match": scoring["category_match"],
-            "priority_match": scoring["priority_match"],
-            "priority_within_one": scoring["priority_within_one"],
-            "confidence_ok": scoring["confidence_ok"],
-            "actual": scoring["actual"],
-        }
-
-    except ResolvehubEvalError as exc:
-        logger.error(
-            "evaluation.resolvehub.api_error",
-            question_id=str(question.id),
-            status_code=exc.status_code,
-            error=str(exc),
-        )
-        result.error = str(exc)
-        result.passed = False
-        result.is_hallucination = False
-        result.failure_reason = "resolvehub_api_error"
-
-    except Exception as exc:
-        logger.error(
-            "evaluation.resolvehub.unexpected_error",
-            question_id=str(question.id),
-            error=str(exc),
-        )
         result.error = str(exc)
         result.passed = False
         result.failure_reason = "unexpected_error"

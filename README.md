@@ -75,17 +75,58 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama pull phi4
 
 # 4. Start services
-docker compose up -d
+docker compose up -d postgres redis api worker
 
 # 5. Run migrations
 docker compose exec api alembic upgrade head
 
 # 6. Seed sample data
-python scripts/seed_sample_data.py http://localhost:8000
+python scripts/seed_sample_data.py http://localhost:8765
 
 # 7. Open dashboard
 open http://localhost:3090
 ```
+
+## Native CLI Auto-Test
+
+The native CLI generates a small golden dataset from a plain-English intent file, creates an EvalForge suite through the REST API, runs a local Ollama model, polls the Celery run, and renders a Rich terminal report.
+
+```bash
+# 1. Install CLI dependencies
+python -m pip install -r cli/requirements.txt
+
+# 2. Create an intent file
+cat > intent.txt <<'EOF'
+This GenAI assistant is specialized in backend architecture and database optimization.
+It must provide highly accurate code snippets using Node.js, Express, and PostgreSQL.
+It needs to handle complex concurrency issues, transaction isolation levels, and row-locking mechanisms.
+The tone must be purely technical, avoiding introductory fluff or generic explanations.
+It must explicitly call out performance regressions or potential deadlocks in its answers.
+EOF
+
+# 3. Run the complete automated evaluation
+python cli/main.py auto-test intent.txt --model phi4
+```
+
+On Windows, if `python` points to a broken install or the Microsoft Store shim, use the included launcher. It finds a healthy Python installation before installing dependencies or running the CLI:
+
+```bat
+scripts\evalforge-cli.cmd -Install
+scripts\evalforge-cli.cmd auto-test intent.txt --model phi4
+```
+
+If Ollama crashes with a CUDA error while loading `phi4`, restart Ollama in CPU mode before running the eval:
+
+```bat
+scripts\start-ollama-cpu.cmd
+scripts\evalforge-cli.cmd auto-test intent.txt --model phi4
+```
+
+The CLI uses ASCII terminal output by default on Windows CMD to avoid mojibake. Set `EVALFORGE_UNICODE=1` only if your terminal is configured for UTF-8 and you want Unicode Rich borders.
+
+Preflight behavior is intentionally quota-safe: the CLI checks Ollama and the EvalForge API before making the single Gemini dataset-generation call. If `phi4` is missing, the CLI attempts to pull it from Ollama automatically. If the API is not ready, it exits before spending Gemini free-tier quota.
+
+The worker path uses synchronous Ollama HTTP calls behind an async boundary. This avoids reusing `httpx.AsyncClient` instances across Celery prefork event loops while keeping the evaluation service API async-friendly. Local Ollama generations are also clamped with `OLLAMA_MAX_TOKENS`, `OLLAMA_NUM_CTX`, and `OLLAMA_NUM_BATCH` to reduce host memory pressure during code-heavy prompts.
 
 ## API Reference
 
@@ -108,7 +149,7 @@ open http://localhost:3090
 | POST | `/api/v1/webhooks/github` | GitHub push webhook |
 | GET | `/api/v1/models` | List Ollama models |
 
-Interactive docs: `http://localhost:8000/api/docs`
+Interactive docs: `http://localhost:8765/api/docs` when using Docker Compose.
 
 ## CI/CD Quality Gates
 

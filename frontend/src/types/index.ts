@@ -48,6 +48,8 @@ export interface EvalRun {
   github_repo: string | null
   celery_task_id: string | null
   error_message: string | null
+  endpoint_url: string | null
+  system_prompt_override: string | null
   total_questions: number
   passed_count: number
   failed_count: number
@@ -72,6 +74,8 @@ export interface EvalRunSummary {
   model_name: string
   status: string
   trigger: string
+  endpoint_url?: string | null
+  system_prompt_override?: string | null
   pass_rate: number | null
   hallucination_rate: number | null
   p95_latency_ms: number | null

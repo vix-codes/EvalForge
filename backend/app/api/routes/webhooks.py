@@ -117,32 +117,10 @@ async def dockops_webhook(
             message=f"Deployment {payload.status} — evaluation only runs on SUCCESS",
         )
 
-    project_lower = payload.project_name.lower()
-    if "resolvehub" not in project_lower:
-        logger.info(
-            "webhook.dockops.not_resolvehub",
-            project=payload.project_name,
-        )
-        return WebhookTriggerResponse(
-            received=True,
-            message=f"Project '{payload.project_name}' is not monitored by EvalForge",
-        )
-
     from sqlalchemy import select
-
-    stmt = (
-        select(EvalSuite)
-        .where(EvalSuite.is_active == True)
-        .where(EvalSuite.tags.ilike("%resolvehub%"))
-        .limit(1)
-    )
+    stmt = select(EvalSuite).where(EvalSuite.is_active == True).limit(1)
     result = await session.execute(stmt)
     suite = result.scalar_one_or_none()
-
-    if not suite:
-        stmt = select(EvalSuite).where(EvalSuite.is_active == True).limit(1)
-        result = await session.execute(stmt)
-        suite = result.scalar_one_or_none()
 
     if not suite:
         logger.warning("webhook.dockops.no_active_suite", project=payload.project_name)
@@ -153,9 +131,9 @@ async def dockops_webhook(
 
     run = EvalRun(
         suite_id=suite.id,
-        model_name="resolvehub-gemini",
-        model_provider="resolvehub",
-        trigger="github_push",
+        model_name=settings.OLLAMA_DEFAULT_MODEL,
+        model_provider="ollama",
+        trigger="dockops_deployment",
         commit_sha=payload.commit_sha,
         commit_branch=payload.commit_branch,
         commit_message=f"DockOps deployment {payload.deployment_id}",
@@ -180,5 +158,5 @@ async def dockops_webhook(
     return WebhookTriggerResponse(
         received=True,
         eval_run_id=str(run.id),
-        message=f"ResolveHub evaluation triggered for deployment {payload.deployment_id[:8]}",
+        message=f"Evaluation triggered for deployment {payload.deployment_id[:8]}",
     )

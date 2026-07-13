@@ -1,12 +1,7 @@
-version: "3.9"
-
 networks:
   evalforge_net:
     driver: bridge
     name: evalforge_net
-  services-net:
-    external: true
-    name: services-net
 
 volumes:
   evalforge_postgres_data:
@@ -65,10 +60,17 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-300}
+      OLLAMA_MAX_RETRIES: ${OLLAMA_MAX_RETRIES:-2}
+      OLLAMA_MAX_TOKENS: ${OLLAMA_MAX_TOKENS:-220}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-4096}
+      OLLAMA_NUM_BATCH: ${OLLAMA_NUM_BATCH:-128}
+      OLLAMA_RETRY_NUM_PREDICT: ${OLLAMA_RETRY_NUM_PREDICT:-128}
+      OLLAMA_RETRY_NUM_CTX: ${OLLAMA_RETRY_NUM_CTX:-2048}
       SECRET_KEY: ${SECRET_KEY:-changeme-use-strong-key-in-production-32chars}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       GEMINI_JUDGE_ENABLED: ${GEMINI_JUDGE_ENABLED:-false}
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
@@ -76,8 +78,6 @@ services:
       MAX_P95_LATENCY_MS: ${MAX_P95_LATENCY_MS:-10000.0}
       MIN_PASS_RATE: ${MIN_PASS_RATE:-0.80}
       DOCKOPS_WEBHOOK_SECRET: ${DOCKOPS_WEBHOOK_SECRET:-}
-      RESOLVEHUB_API_URL: ${RESOLVEHUB_API_URL:-http://resolvehub-backend:5000}
-      RESOLVEHUB_EVAL_SECRET: ${RESOLVEHUB_EVAL_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,7 +85,6 @@ services:
         condition: service_healthy
     networks:
       - evalforge_net
-      - services-net
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -103,6 +102,7 @@ services:
       dockerfile: Dockerfile.worker
     container_name: evalforge_worker
     restart: unless-stopped
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-1} -Q celery
     environment:
       DATABASE_URL: postgresql+asyncpg://evalforge:${POSTGRES_PASSWORD:-evalforge_secure_pass}@postgres:5432/evalforge
       REDIS_URL: redis://redis:6379/0
@@ -110,13 +110,18 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-300}
+      OLLAMA_MAX_RETRIES: ${OLLAMA_MAX_RETRIES:-2}
+      OLLAMA_MAX_TOKENS: ${OLLAMA_MAX_TOKENS:-220}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-4096}
+      OLLAMA_NUM_BATCH: ${OLLAMA_NUM_BATCH:-128}
+      OLLAMA_RETRY_NUM_PREDICT: ${OLLAMA_RETRY_NUM_PREDICT:-128}
+      OLLAMA_RETRY_NUM_CTX: ${OLLAMA_RETRY_NUM_CTX:-2048}
       SECRET_KEY: ${SECRET_KEY:-changeme-use-strong-key-in-production-32chars}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       GEMINI_JUDGE_ENABLED: ${GEMINI_JUDGE_ENABLED:-false}
-      RESOLVEHUB_API_URL: ${RESOLVEHUB_API_URL:-http://resolvehub-backend:5000}
-      RESOLVEHUB_EVAL_SECRET: ${RESOLVEHUB_EVAL_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -124,7 +129,6 @@ services:
         condition: service_healthy
     networks:
       - evalforge_net
-      - services-net
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

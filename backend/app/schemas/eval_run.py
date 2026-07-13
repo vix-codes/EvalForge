@@ -11,6 +11,10 @@ class EvalRunCreate(BaseSchema):
     model_name: str = Field(min_length=1, max_length=100)
     model_provider: str = "ollama"
     trigger: str = "manual"
+    # Dynamic endpoint — leave empty to use server default (OLLAMA_BASE_URL)
+    endpoint_url: str | None = None
+    # Override the evaluation system prompt to describe the LLM's purpose
+    system_prompt_override: str | None = None
 
 
 class EvalRunResponse(BaseSchema):
@@ -27,6 +31,8 @@ class EvalRunResponse(BaseSchema):
     github_repo: str | None
     celery_task_id: str | None
     error_message: str | None
+    endpoint_url: str | None
+    system_prompt_override: str | None
     total_questions: int
     passed_count: int
     failed_count: int

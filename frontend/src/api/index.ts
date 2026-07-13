@@ -59,7 +59,13 @@ export const fetchEvalRuns = (params?: {
 export const fetchEvalRun = (id: string) =>
   apiClient.get<EvalRun>(`/evals/${id}`).then((r) => r.data)
 
-export const createEvalRun = (data: { suite_id: string; model_name: string; model_provider?: string }) =>
+export const createEvalRun = (data: {
+  suite_id: string
+  model_name: string
+  model_provider?: string
+  endpoint_url?: string
+  system_prompt_override?: string
+}) =>
   apiClient.post<EvalRun>('/evals', data).then((r) => r.data)
 
 export const fetchRunResults = (
@@ -85,4 +91,4 @@ export const fetchFailureBreakdown = (runId: string) =>
 
 // Models
 export const fetchAvailableModels = () =>
-  apiClient.get<{ supported: string[]; installed: string[]; default: string }>('/models').then((r) => r.data)
+  apiClient.get<{ installed: string[]; default: string; note: string }>('/models').then((r) => r.data)

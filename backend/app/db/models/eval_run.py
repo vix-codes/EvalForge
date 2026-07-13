@@ -35,6 +35,10 @@ class EvalRun(Base, UUIDMixin, TimestampMixin):
     celery_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Dynamic endpoint fields — allow any local/deployed LLM
+    endpoint_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    system_prompt_override: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Aggregate metrics
     total_questions: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     passed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

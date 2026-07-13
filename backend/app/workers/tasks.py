@@ -8,12 +8,14 @@ from app.workers.celery_app import celery_app
 logger = structlog.get_logger(__name__)
 
 
+_worker_loop = None
+
 def _run_async(coro):
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    global _worker_loop
+    if _worker_loop is None or _worker_loop.is_closed():
+        _worker_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_worker_loop)
+    return _worker_loop.run_until_complete(coro)
 
 
 @celery_app.task(

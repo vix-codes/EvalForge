@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AnyHttpUrl, Field, PostgresDsn, RedisDsn, field_validator
+from pydantic import AnyHttpUrl, Field, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = False
     SECRET_KEY: str = Field(min_length=32)
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://evalforge:evalforge@localhost:5432/evalforge"
@@ -44,8 +44,16 @@ class Settings(BaseSettings):
     # Ollama
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_DEFAULT_MODEL: str = "phi4"
-    OLLAMA_TIMEOUT: int = 120
+    OLLAMA_TIMEOUT: int = 300
     OLLAMA_MAX_RETRIES: int = 3
+    OLLAMA_MAX_TOKENS: int = 220
+    OLLAMA_NUM_CTX: int = 4096
+    OLLAMA_NUM_BATCH: int = 128
+    # Reduced params used on OOM (HTTP 500) retry
+    OLLAMA_RETRY_NUM_PREDICT: int = 128
+    OLLAMA_RETRY_NUM_CTX: int = 2048
+    # Max input characters per prompt before truncation (prevents OOM on long questions)
+    OLLAMA_MAX_PROMPT_CHARS: int = 1200
 
     # Gemini
     GEMINI_API_KEY: str = ""
@@ -65,10 +73,6 @@ class Settings(BaseSettings):
     # DockOps Integration
     DOCKOPS_WEBHOOK_SECRET: str = ""
 
-    # ResolveHub Integration
-    RESOLVEHUB_API_URL: str = "http://resolvehub-backend:5000"
-    RESOLVEHUB_EVAL_SECRET: str = ""
-    RESOLVEHUB_EVAL_TIMEOUT: float = 15.0
 
     # Quality Gates
     MAX_HALLUCINATION_RATE: float = 0.15
@@ -79,12 +83,17 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
-    @field_validator("ALLOWED_ORIGINS", mode="before")
-    @classmethod
-    def parse_origins(cls, v: str | list) -> list[str]:
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        value = self.ALLOWED_ORIGINS.strip()
+        if not value:
+            return []
+        if value.startswith("["):
+            import json
+
+            parsed = json.loads(value)
+            return [str(origin).strip() for origin in parsed if str(origin).strip()]
+        return [origin.strip() for origin in value.split(",") if origin.strip()]
 
 
 @lru_cache

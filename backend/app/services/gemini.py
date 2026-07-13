@@ -1,3 +1,13 @@
+"""
+Gemini service — judge scoring only.
+
+GeminiJudge is used by the scoring pipeline to optionally rate model responses
+against golden answers (LLM-as-judge pattern).
+
+The Gemini inference model path (model_provider="gemini") is handled directly
+inside evaluation.py to keep this module focused on judging.
+"""
+
 import httpx
 
 from app.core.config import settings
@@ -63,7 +73,11 @@ class GeminiJudge:
         except GeminiError:
             raise
         except httpx.HTTPStatusError as exc:
-            logger.error("gemini.judge.http_error", status=exc.response.status_code, body=exc.response.text[:200])
+            logger.error(
+                "gemini.judge.http_error",
+                status=exc.response.status_code,
+                body=exc.response.text[:200],
+            )
             raise GeminiError(f"Gemini API error {exc.response.status_code}") from exc
         except Exception as exc:
             logger.error("gemini.judge.failed", error=str(exc))
@@ -93,63 +107,3 @@ def get_gemini_judge() -> GeminiJudge:
     if _gemini_judge is None:
         _gemini_judge = GeminiJudge()
     return _gemini_judge
-
-
-CLASSIFY_PROMPT = """\
-Classify this maintenance complaint. Reply with EXACTLY two words on one line, nothing else.
-
-Format: CATEGORY PRIORITY
-
-Categories: PLUMBING, ELECTRICAL, SECURITY, CLEANING, INTERNET, HVAC, STRUCTURAL, GENERAL
-Priorities: LOW, MEDIUM, HIGH, CRITICAL
-
-Complaint: {complaint}"""
-
-
-class GeminiClassifier:
-    def __init__(self, api_key: str | None = None) -> None:
-        self.api_key = api_key or settings.GEMINI_API_KEY
-        self.model = settings.GEMINI_MODEL
-        self._rpm_delay = 7.0  # 7s between calls → ~8 RPM, safely under 10 RPM free tier
-
-    async def classify(self, complaint: str) -> tuple[str, float]:
-        if not self.api_key:
-            raise GeminiError("GEMINI_API_KEY is not configured")
-
-        import asyncio
-        await asyncio.sleep(self._rpm_delay)
-
-        url = GEMINI_API_URL.format(model=self.model)
-        payload = {
-            "contents": [{"parts": [{"text": CLASSIFY_PROMPT.format(complaint=complaint)}]}],
-            "generationConfig": {"temperature": 0.0, "maxOutputTokens": 256},
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                t0 = __import__("time").perf_counter()
-                response = await client.post(url, json=payload, params={"key": self.api_key})
-                latency_ms = (__import__("time").perf_counter() - t0) * 1000
-                response.raise_for_status()
-                data = response.json()
-
-            text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-            logger.info("gemini.classify.success", latency_ms=round(latency_ms))
-            return text, round(latency_ms, 1)
-
-        except httpx.HTTPStatusError as exc:
-            logger.error("gemini.classify.http_error", status=exc.response.status_code, body=exc.response.text[:200])
-            raise GeminiError(f"Gemini API error {exc.response.status_code}") from exc
-        except Exception as exc:
-            logger.error("gemini.classify.failed", error=str(exc))
-            raise GeminiError(str(exc)) from exc
-
-
-_gemini_classifier: GeminiClassifier | None = None
-
-
-def get_gemini_classifier() -> GeminiClassifier:
-    global _gemini_classifier
-    if _gemini_classifier is None:
-        _gemini_classifier = GeminiClassifier()
-    return _gemini_classifier

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,87 +12,128 @@
   }
 
   body {
-    background-color: #0a0a0f;
-    color: #f1f5f9;
-    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+    background-color: #06060f;
+    color: #e2e8f0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     font-size: 14px;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: #0a0a0f;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: #1e1e2e;
-    border-radius: 3px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: #2d2d45;
-  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #334155; }
 }
 
 @layer components {
+
+  /* ── Cards ── */
   .card {
-    @apply bg-bg-card border border-bg-border rounded-lg p-4;
+    @apply bg-[#0d0d1a] border border-white/5 rounded-xl p-5;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 4px 24px rgba(0,0,0,0.4);
+  }
+  .card-glow {
+    @apply card;
+    box-shadow: 0 0 0 1px rgba(99,102,241,0.15), 0 8px 32px rgba(99,102,241,0.08);
   }
 
+  /* ── Badges ── */
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium;
   }
+  .badge-green  { @apply badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20; }
+  .badge-red    { @apply badge bg-red-500/10     text-red-400     border border-red-500/20; }
+  .badge-yellow { @apply badge bg-amber-500/10   text-amber-400   border border-amber-500/20; }
+  .badge-blue   { @apply badge bg-indigo-500/10  text-indigo-400  border border-indigo-500/20; }
+  .badge-purple { @apply badge bg-violet-500/10  text-violet-400  border border-violet-500/20; }
+  .badge-gray   { @apply badge bg-slate-500/10   text-slate-400   border border-slate-500/20; }
+  .badge-cyan   { @apply badge bg-cyan-500/10    text-cyan-400    border border-cyan-500/20; }
 
-  .badge-green {
-    @apply badge bg-accent-green/10 text-accent-green border border-accent-green/20;
-  }
-
-  .badge-red {
-    @apply badge bg-accent-red/10 text-accent-red border border-accent-red/20;
-  }
-
-  .badge-yellow {
-    @apply badge bg-accent-yellow/10 text-accent-yellow border border-accent-yellow/20;
-  }
-
-  .badge-blue {
-    @apply badge bg-accent-blue/10 text-accent-blue border border-accent-blue/20;
-  }
-
-  .badge-purple {
-    @apply badge bg-accent-purple/10 text-accent-purple border border-accent-purple/20;
-  }
-
-  .badge-gray {
-    @apply badge bg-text-muted/10 text-text-secondary border border-text-muted/20;
-  }
-
+  /* ── Buttons ── */
   .btn {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-150 cursor-pointer;
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
+           transition-all duration-200 cursor-pointer select-none;
   }
-
   .btn-primary {
-    @apply btn bg-accent-blue text-white hover:bg-accent-blue/80;
+    @apply btn bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98]
+           shadow-lg shadow-indigo-600/20;
   }
-
   .btn-secondary {
-    @apply btn bg-bg-border text-text-primary hover:bg-bg-border/70;
+    @apply btn bg-white/5 text-slate-300 border border-white/10
+           hover:bg-white/10 hover:text-white active:scale-[0.98];
   }
-
   .btn-danger {
-    @apply btn bg-accent-red/10 text-accent-red border border-accent-red/20 hover:bg-accent-red/20;
+    @apply btn bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20;
+  }
+  .btn-success {
+    @apply btn bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20;
   }
 
+  /* ── Inputs ── */
   .input {
-    @apply bg-bg-secondary border border-bg-border rounded-md px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-blue/50 focus:ring-1 focus:ring-accent-blue/30 transition-colors;
+    @apply bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200
+           placeholder-slate-600 focus:outline-none focus:border-indigo-500/50
+           focus:ring-1 focus:ring-indigo-500/20 transition-all duration-200;
   }
 
+  /* ── Table rows ── */
   .table-row {
-    @apply border-b border-bg-border hover:bg-bg-secondary/50 transition-colors;
+    @apply border-b border-white/5 hover:bg-white/[0.03] transition-colors duration-150;
   }
+
+  /* ── Metric number ── */
+  .metric-value {
+    @apply text-2xl font-bold tracking-tight font-mono;
+  }
+
+  /* ── Pulse dot (live indicator) ── */
+  .pulse-dot {
+    @apply w-2 h-2 rounded-full bg-emerald-400 relative;
+  }
+  .pulse-dot::after {
+    content: '';
+    @apply absolute inset-0 rounded-full bg-emerald-400;
+    animation: ping 1.4s cubic-bezier(0,0,0.2,1) infinite;
+  }
+
+  /* ── Gradient text ── */
+  .gradient-text {
+    @apply bg-gradient-to-r from-indigo-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent;
+  }
+
+  /* ── Progress bar ── */
+  .progress-bar {
+    @apply h-1.5 rounded-full bg-white/5 overflow-hidden;
+  }
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-700;
+  }
+}
+
+/* ── Custom animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes ping {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in  { animation: fadeIn 0.4s ease both; }
+.animate-slide-in { animation: slideIn 0.3s ease both; }
+
+.skeleton {
+  background: linear-gradient(90deg, #0d0d1a 25%, #141428 50%, #0d0d1a 75%);
+  background-size: 200% auto;
+  animation: shimmer 1.5s linear infinite;
+  border-radius: 6px;
 }

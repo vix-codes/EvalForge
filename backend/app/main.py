@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import analytics, datasets, evals, health, models, resolvehub, suites, webhooks
+from app.api.routes import analytics, datasets, evals, health, models, suites, webhooks
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
 
@@ -36,7 +36,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -75,7 +75,7 @@ app.include_router(evals.router, prefix=API_PREFIX)
 app.include_router(analytics.router, prefix=API_PREFIX)
 app.include_router(webhooks.router, prefix=API_PREFIX)
 app.include_router(models.router, prefix=API_PREFIX)
-app.include_router(resolvehub.router, prefix=API_PREFIX)
+
 
 
 @app.get("/")

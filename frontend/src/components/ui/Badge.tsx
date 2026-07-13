@@ -1,39 +1,32 @@
-import { clsx } from 'clsx'
+import { CheckCircle2, Clock, Loader2, XCircle, AlertTriangle, ShieldCheck, ShieldX } from 'lucide-react'
 
-interface BadgeProps {
-  label: string
-  variant?: 'green' | 'red' | 'yellow' | 'blue' | 'purple' | 'gray'
-}
-
-const variantMap: Record<string, string> = {
-  green: 'badge-green',
-  red: 'badge-red',
-  yellow: 'badge-yellow',
-  blue: 'badge-blue',
-  purple: 'badge-purple',
-  gray: 'badge-gray',
-}
-
-export function Badge({ label, variant = 'gray' }: BadgeProps) {
-  return <span className={clsx('badge', variantMap[variant])}>{label}</span>
+const STATUS_MAP: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
+  completed: { label: 'Completed', cls: 'badge-green',  icon: <CheckCircle2 className="w-3 h-3" /> },
+  running:   { label: 'Running',   cls: 'badge-blue',   icon: <Loader2 className="w-3 h-3 animate-spin" /> },
+  pending:   { label: 'Pending',   cls: 'badge-yellow', icon: <Clock className="w-3 h-3" /> },
+  failed:    { label: 'Failed',    cls: 'badge-red',    icon: <XCircle className="w-3 h-3" /> },
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; variant: BadgeProps['variant'] }> = {
-    completed: { label: 'Completed', variant: 'green' },
-    running: { label: 'Running', variant: 'blue' },
-    pending: { label: 'Pending', variant: 'yellow' },
-    failed: { label: 'Failed', variant: 'red' },
-  }
-  const cfg = map[status] ?? { label: status, variant: 'gray' }
-  return <Badge label={cfg.label} variant={cfg.variant} />
+  const s = STATUS_MAP[status] ?? { label: status, cls: 'badge-gray', icon: null }
+  return (
+    <span className={s.cls}>
+      {s.icon}
+      {s.label}
+    </span>
+  )
 }
 
-export function QualityGateBadge({ passed }: { passed: boolean | null }) {
-  if (passed === null) return <Badge label="N/A" variant="gray" />
-  return passed ? <Badge label="PASS" variant="green" /> : <Badge label="FAIL" variant="red" />
+export function QualityGateBadge({ passed }: { passed: boolean | null | undefined }) {
+  if (passed === null || passed === undefined) return <span className="badge-gray">—</span>
+  return passed
+    ? <span className="badge-green"><ShieldCheck className="w-3 h-3" /> Pass</span>
+    : <span className="badge-red"><ShieldX className="w-3 h-3" /> Fail</span>
 }
 
-export function PassBadge({ passed }: { passed: boolean }) {
-  return passed ? <Badge label="Pass" variant="green" /> : <Badge label="Fail" variant="red" />
+export function HallucinationBadge({ rate }: { rate: number | null | undefined }) {
+  if (rate === null || rate === undefined) return <span className="badge-gray">—</span>
+  if (rate === 0) return <span className="badge-green"><CheckCircle2 className="w-3 h-3" /> Clean</span>
+  if (rate < 0.1) return <span className="badge-yellow"><AlertTriangle className="w-3 h-3" /> Low</span>
+  return <span className="badge-red"><AlertTriangle className="w-3 h-3" /> High</span>
 }

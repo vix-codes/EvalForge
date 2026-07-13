@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Plus, RefreshCw, Server, MessageSquare } from 'lucide-react'
 import { format } from 'date-fns'
 import { createEvalRun, fetchEvalRuns, fetchSuites, fetchAvailableModels } from '../api'
 import { StatusBadge, QualityGateBadge } from '../components/ui/Badge'
-import { MetricCard, ms, pct } from '../components/ui/Metric'
+import { ms, pct } from '../components/ui/Metric'
 import type { EvalRunSummary, EvalSuiteSummary } from '../types'
 import { usePolling } from '../hooks/usePolling'
 
@@ -13,13 +13,18 @@ export function EvalRuns() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [suites, setSuites] = useState<EvalSuiteSummary[]>([])
-  const [models, setModels] = useState<string[]>([])
+  const [installedModels, setInstalledModels] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [selectedSuite, setSelectedSuite] = useState('')
-  const [selectedModel, setSelectedModel] = useState('phi4')
   const [filterStatus, setFilterStatus] = useState('')
+
+  // Form state
+  const [selectedSuite, setSelectedSuite] = useState('')
+  const [modelName, setModelName] = useState('phi4')
+  const [modelProvider, setModelProvider] = useState('ollama')
+  const [endpointUrl, setEndpointUrl] = useState('')
+  const [systemPromptOverride, setSystemPromptOverride] = useState('')
 
   const PAGE_SIZE = 20
 
@@ -42,17 +47,23 @@ export function EvalRuns() {
   useEffect(() => {
     load()
     fetchSuites({ active_only: true }).then((r) => setSuites(r.items))
-    fetchAvailableModels().then((m) => setModels(m.supported))
+    fetchAvailableModels().then((m) => setInstalledModels(m.installed))
   }, [page, filterStatus])
 
   const hasRunning = runs.some((r) => r.status === 'running' || r.status === 'pending')
   usePolling(load, 5000, hasRunning)
 
   const handleCreate = async () => {
-    if (!selectedSuite) return
+    if (!selectedSuite || !modelName.trim()) return
     setCreating(true)
     try {
-      await createEvalRun({ suite_id: selectedSuite, model_name: selectedModel })
+      await createEvalRun({
+        suite_id: selectedSuite,
+        model_name: modelName.trim(),
+        model_provider: modelProvider,
+        endpoint_url: endpointUrl.trim() || undefined,
+        system_prompt_override: systemPromptOverride.trim() || undefined,
+      })
       setShowForm(false)
       load()
     } finally {
@@ -78,8 +89,10 @@ export function EvalRuns() {
       </div>
 
       {showForm && (
-        <div className="card border-accent-blue/30 space-y-3">
+        <div className="card border-accent-blue/30 space-y-4">
           <h3 className="text-sm font-semibold text-text-primary">Trigger Evaluation Run</h3>
+
+          {/* Row 1: Suite + Provider */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-text-muted mb-1 block">Suite</label>
@@ -95,14 +108,74 @@ export function EvalRuns() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-text-muted mb-1 block">Model</label>
-              <select className="input w-full" value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
-                {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              <label className="text-xs text-text-muted mb-1 block">Provider</label>
+              <select
+                className="input w-full"
+                value={modelProvider}
+                onChange={(e) => setModelProvider(e.target.value)}
+              >
+                <option value="ollama">Ollama (local / any compatible)</option>
+                <option value="openai_compat">OpenAI-compatible</option>
+                <option value="gemini">Gemini</option>
               </select>
             </div>
           </div>
+
+          {/* Row 2: Model name (free-text) + Endpoint URL */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-text-muted mb-1 block">Model Name</label>
+              <input
+                className="input w-full font-mono"
+                placeholder="phi4, llama3.2, qwen2.5, ..."
+                value={modelName}
+                onChange={(e) => setModelName(e.target.value)}
+                list="installed-models"
+              />
+              <datalist id="installed-models">
+                {installedModels.map((m) => <option key={m} value={m} />)}
+              </datalist>
+              {installedModels.length > 0 && (
+                <p className="text-xs text-text-muted mt-1">
+                  Installed: {installedModels.join(', ')}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="text-xs text-text-muted mb-1 flex items-center gap-1">
+                <Server className="w-3 h-3" /> Endpoint URL
+                <span className="text-text-muted/60">(optional — uses server default if blank)</span>
+              </label>
+              <input
+                className="input w-full font-mono"
+                placeholder="http://host.docker.internal:11434"
+                value={endpointUrl}
+                onChange={(e) => setEndpointUrl(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Row 3: System prompt override */}
+          <div>
+            <label className="text-xs text-text-muted mb-1 flex items-center gap-1">
+              <MessageSquare className="w-3 h-3" /> Purpose / System Prompt Override
+              <span className="text-text-muted/60">(optional — describes what this LLM is for)</span>
+            </label>
+            <textarea
+              className="input w-full font-mono text-xs"
+              rows={3}
+              placeholder="e.g. This assistant is specialised in backend architecture. It must provide concise Node.js + PostgreSQL code snippets..."
+              value={systemPromptOverride}
+              onChange={(e) => setSystemPromptOverride(e.target.value)}
+            />
+          </div>
+
           <div className="flex gap-2">
-            <button onClick={handleCreate} disabled={!selectedSuite || creating} className="btn-primary">
+            <button
+              onClick={handleCreate}
+              disabled={!selectedSuite || !modelName.trim() || creating}
+              className="btn-primary"
+            >
               {creating ? 'Triggering...' : 'Trigger Run'}
             </button>
             <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
