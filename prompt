@@ -1,0 +1,27 @@
+I have an existing AI evaluation platform called EvalForge built with FastAPI, 
+Redis, Celery, PostgreSQL, and Ollama. It currently benchmarks raw LLM outputs 
+against golden datasets, measuring hallucination rate, latency, and cost.
+
+I want to extend it to also evaluate a RAG (Retrieval-Augmented Generation) 
+pipeline, not just raw LLM calls. Please:
+
+1. Add a lightweight RAG pipeline module using LangChain: ingest a small set 
+   of documents (I'll provide a /docs folder of markdown/PDF files), chunk 
+   them, embed them, and store in a vector store (use Chroma for simplicity 
+   since it's local/no external service needed).
+2. Add a new evaluation target type "rag" alongside the existing "raw_llm" 
+   target, so the existing Celery task pipeline can route eval jobs to either.
+3. Implement RAGAS-style metrics for the RAG target: faithfulness, answer 
+   relevance, and context precision. If the ragas library is too heavy, 
+   implement simplified versions of these three metrics manually using the 
+   existing Ollama model as a judge (LLM-as-judge scoring).
+4. Store RAG eval results in PostgreSQL using the existing results schema, 
+   adding columns for the three new metrics.
+5. Add a small test set of 15-20 question/answer pairs against the ingested 
+   docs so I can run a full eval batch and see real numbers.
+6. Update the README to document the new RAG evaluation capability, including 
+   a sample output showing faithfulness/relevance/precision scores.
+
+Keep the existing raw LLM evaluation path fully working — this is additive, 
+not a replacement. Ask me before making any breaking changes to the existing 
+API routes or database schema.
