@@ -23,6 +23,7 @@ export function EvalRuns() {
   const [selectedSuite, setSelectedSuite] = useState('')
   const [modelName, setModelName] = useState('phi4')
   const [modelProvider, setModelProvider] = useState('ollama')
+  const [targetType, setTargetType] = useState('raw_llm')
   const [endpointUrl, setEndpointUrl] = useState('')
   const [systemPromptOverride, setSystemPromptOverride] = useState('')
 
@@ -61,6 +62,7 @@ export function EvalRuns() {
         suite_id: selectedSuite,
         model_name: modelName.trim(),
         model_provider: modelProvider,
+        target_type: targetType,
         endpoint_url: endpointUrl.trim() || undefined,
         system_prompt_override: systemPromptOverride.trim() || undefined,
       })
@@ -92,8 +94,8 @@ export function EvalRuns() {
         <div className="card border-accent-blue/30 space-y-4">
           <h3 className="text-sm font-semibold text-text-primary">Trigger Evaluation Run</h3>
 
-          {/* Row 1: Suite + Provider */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Row 1: Suite + Target Type + Provider */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-xs text-text-muted mb-1 block">Suite</label>
               <select
@@ -105,6 +107,17 @@ export function EvalRuns() {
                 {suites.map((s) => (
                   <option key={s.id} value={s.id}>{s.name} (v{s.version})</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-text-muted mb-1 block">Target Type</label>
+              <select
+                className="input w-full font-semibold text-accent-cyan"
+                value={targetType}
+                onChange={(e) => setTargetType(e.target.value)}
+              >
+                <option value="raw_llm">RAW LLM (Direct Output)</option>
+                <option value="rag">RAG Pipeline (Docs + Chroma)</option>
               </select>
             </div>
             <div>

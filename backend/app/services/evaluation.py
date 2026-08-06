@@ -70,7 +70,24 @@ async def execute_evaluation_run(
     # Resolve which system prompt to use for this run
     system_prompt = run.system_prompt_override or DEFAULT_SYSTEM_PROMPT
 
-    if run.model_provider == "gemini":
+    if run.target_type == "rag":
+        # RAG evaluation target path using LangChain & Chroma
+        from app.services.rag import initialize_vectorstore
+        # Ensure vector store is initialized/indexed
+        initialize_vectorstore()
+
+        for question in questions:
+            result_obj = await _evaluate_rag_question(
+                run=run,
+                question=question,
+                system_prompt=system_prompt,
+                session=session,
+            )
+            results.append(result_obj)
+            if result_obj.latency_ms is not None:
+                latencies.append(result_obj.latency_ms)
+
+    elif run.model_provider == "gemini":
         # Use Gemini as the inference model (not just judge)
         judge = get_gemini_judge()
         for question in questions:
@@ -84,7 +101,7 @@ async def execute_evaluation_run(
             if result_obj.latency_ms is not None:
                 latencies.append(result_obj.latency_ms)
     else:
-        # Ollama-compatible endpoint: local or any deployed URL
+        # Ollama-compatible endpoint: local or any deployed URL (raw_llm target)
         adapter = get_ollama_adapter(base_url=run.endpoint_url)
         for question in questions:
             result_obj = await _evaluate_question(
@@ -106,9 +123,13 @@ async def execute_evaluation_run(
     logger.info(
         "evaluation.run.completed",
         run_id=str(run_id),
+        target_type=run.target_type,
         pass_rate=run.pass_rate,
         hallucination_rate=run.hallucination_rate,
         p95_latency_ms=run.p95_latency_ms,
+        avg_faithfulness=run.avg_faithfulness,
+        avg_answer_relevance=run.avg_answer_relevance,
+        avg_context_precision=run.avg_context_precision,
     )
 
     await session.flush()
@@ -253,6 +274,62 @@ async def _evaluate_gemini_question(
     return result
 
 
+async def _evaluate_rag_question(
+    run: EvalRun,
+    question: GoldenQuestion,
+    system_prompt: str,
+    session: AsyncSession,
+) -> EvalResult:
+    """Evaluate a single golden question using the RAG pipeline target."""
+    result = EvalResult(run_id=run.id, question_id=question.id)
+    session.add(result)
+
+    try:
+        from app.services.rag import execute_rag_pipeline
+        from app.services.rag_scoring import score_rag_response
+
+        rag_output = await execute_rag_pipeline(
+            question=question.question,
+            model_name=run.model_name,
+            endpoint_url=run.endpoint_url,
+            system_prompt=system_prompt,
+        )
+
+        result.model_response = rag_output["model_response"]
+        result.latency_ms = rag_output["latency_ms"]
+        result.retrieved_contexts = rag_output["retrieved_contexts"]
+
+        rag_scores = await score_rag_response(
+            question=question.question,
+            golden_answer=question.golden_answer,
+            model_response=rag_output["model_response"],
+            retrieved_contexts=rag_output["retrieved_contexts"],
+            expected_keywords=question.expected_keywords,
+            model_name=run.model_name,
+            endpoint_url=run.endpoint_url,
+        )
+
+        result.faithfulness = rag_scores.faithfulness
+        result.answer_relevance = rag_scores.answer_relevance
+        result.context_precision = rag_scores.context_precision
+        result.similarity_score = rag_scores.similarity_score
+        result.keyword_coverage = rag_scores.keyword_coverage
+        result.final_score = rag_scores.final_score
+        result.passed = rag_scores.passed
+        result.is_hallucination = rag_scores.is_hallucination
+        result.failure_reason = rag_scores.failure_reason
+        result.scoring_metadata = rag_scores.scoring_metadata
+
+    except Exception as exc:
+        logger.error("evaluation.rag_question.error", question_id=str(question.id), error=str(exc))
+        result.error = str(exc)
+        result.passed = False
+        result.failure_reason = "rag_pipeline_error"
+
+    await session.flush()
+    return result
+
+
 def _aggregate_metrics(
     run: EvalRun,
     results: list[EvalResult],
@@ -275,6 +352,15 @@ def _aggregate_metrics(
 
     run.avg_similarity_score = round(statistics.mean(sim_scores), 4) if sim_scores else None
     run.avg_keyword_coverage = round(statistics.mean(kw_scores), 4) if kw_scores else None
+
+    # RAG Aggregate Metrics
+    faith_scores = [r.faithfulness for r in results if r.faithfulness is not None]
+    rel_scores = [r.answer_relevance for r in results if r.answer_relevance is not None]
+    prec_scores = [r.context_precision for r in results if r.context_precision is not None]
+
+    run.avg_faithfulness = round(statistics.mean(faith_scores), 4) if faith_scores else None
+    run.avg_answer_relevance = round(statistics.mean(rel_scores), 4) if rel_scores else None
+    run.avg_context_precision = round(statistics.mean(prec_scores), 4) if prec_scores else None
 
     if latencies:
         sorted_lat = sorted(latencies)

@@ -49,15 +49,37 @@ EvalForge/
 - `qwen2.5`
 - `gemma3`
 
-## Scoring Engine
+## Scoring Engine & RAGAS Metrics
 
-Each model response is scored using:
+EvalForge supports two distinct evaluation target types:
+1. **`raw_llm`**: Benchmarks direct LLM outputs against golden answers without context retrieval.
+2. **`rag`**: Ingests document collections (`.md`, `.pdf` in `/docs`), indexes them into a persistent **Chroma** vector store, retrieves top-k contexts, and calculates **RAGAS-style metrics**.
 
-1. **Cosine similarity** (TF-IDF) — compares semantic overlap with golden answer
-2. **Keyword coverage** — checks presence of expected keywords in response
-3. **Gemini LLM-as-judge** (optional) — uses Gemini Flash to judge response quality
+### RAGAS Metrics (for `rag` target)
 
-**Hallucination detection:** low similarity + low keyword coverage = flagged as hallucination
+| Metric | Focus | Scale | Description |
+|--------|-------|-------|-------------|
+| **Faithfulness** | Groundedness | 0.0 – 1.0 | Measures if answer claims are strictly supported by retrieved context chunks without hallucination. |
+| **Answer Relevance** | Directness | 0.0 – 1.0 | Measures if the response directly addresses the prompt without extraneous details. |
+| **Context Precision** | Retrieval Quality | 0.0 – 1.0 | Evaluates AP@K ranking of retrieved chunks against golden answer & question. |
+
+### Sample RAG Evaluation Output
+
+```
++-----------------------------------------------------------------------------------+
+| Total Questions | Pass Rate | Faithfulness | Answer Relevance | Context Precision |
++-----------------+-----------+--------------+------------------+-------------------+
+|       16        |   87.5%   |    0.925     |      0.880       |       0.910       |
++-----------------------------------------------------------------------------------+
+
+Detailed Results:
++------------------------------------+-------------------------+--------------+-----------+-----------+--------+
+| Question                           | Model Answer Snippet    | Faithfulness | Relevance | Precision | Status |
++------------------------------------+-------------------------+--------------+-----------+-----------+--------+
+| What is EvalForge and what does... | EvalForge is an enterprise|    0.950     |   0.920   |   1.000   |  PASS  |
+| What vector store is used for...   | Uses ChromaDB locally.. |    1.000     |   0.950   |   0.833   |  PASS  |
++------------------------------------+-------------------------+--------------+-----------+-----------+--------+
+```
 
 ## Quick Start (Local)
 

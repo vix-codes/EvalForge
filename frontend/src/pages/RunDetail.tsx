@@ -91,6 +91,9 @@ export function RunDetail() {
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-xl font-bold text-white font-mono">{run.model_name}</h1>
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold ${run.target_type === 'rag' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-slate-800 text-slate-300'}`}>
+              TARGET: {(run.target_type || 'raw_llm').toUpperCase()}
+            </span>
             <StatusBadge status={run.status} />
             <QualityGateBadge passed={run.quality_gate_passed} />
             {isLive && <span className="pulse-dot" />}
@@ -110,6 +113,28 @@ export function RunDetail() {
         <div className="card border border-red-500/20 bg-red-500/5 flex items-start gap-3">
           <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
           <p className="text-red-300 text-sm font-mono">{run.error_message}</p>
+        </div>
+      )}
+
+      {/* RAG Metrics Row if RAG Target */}
+      {run.target_type === 'rag' && (
+        <div className="grid grid-cols-3 gap-4">
+          <MetricCard
+            label="Faithfulness"
+            value={run.avg_faithfulness?.toFixed(3) ?? '—'}
+            color="text-cyan-400"
+            glow={true}
+          />
+          <MetricCard
+            label="Answer Relevance"
+            value={run.avg_answer_relevance?.toFixed(3) ?? '—'}
+            color="text-purple-400"
+          />
+          <MetricCard
+            label="Context Precision"
+            value={run.avg_context_precision?.toFixed(3) ?? '—'}
+            color="text-amber-400"
+          />
         </div>
       )}
 
@@ -159,6 +184,30 @@ export function RunDetail() {
             </div>
             <ScoreBar value={run.pass_rate ?? 0} color="bg-indigo-500" />
           </div>
+          {run.avg_faithfulness !== undefined && run.avg_faithfulness !== null && (
+            <div>
+              <div className="flex justify-between text-xs text-slate-500 mb-2">
+                <span>Faithfulness</span><span className="font-mono text-white">{run.avg_faithfulness.toFixed(3)}</span>
+              </div>
+              <ScoreBar value={run.avg_faithfulness} color="bg-cyan-500" />
+            </div>
+          )}
+          {run.avg_answer_relevance !== undefined && run.avg_answer_relevance !== null && (
+            <div>
+              <div className="flex justify-between text-xs text-slate-500 mb-2">
+                <span>Answer Relevance</span><span className="font-mono text-white">{run.avg_answer_relevance.toFixed(3)}</span>
+              </div>
+              <ScoreBar value={run.avg_answer_relevance} color="bg-purple-500" />
+            </div>
+          )}
+          {run.avg_context_precision !== undefined && run.avg_context_precision !== null && (
+            <div>
+              <div className="flex justify-between text-xs text-slate-500 mb-2">
+                <span>Context Precision</span><span className="font-mono text-white">{run.avg_context_precision.toFixed(3)}</span>
+              </div>
+              <ScoreBar value={run.avg_context_precision} color="bg-amber-500" />
+            </div>
+          )}
           <div>
             <div className="flex justify-between text-xs text-slate-500 mb-2">
               <span>Avg Similarity</span><span className="font-mono text-white">{run.avg_similarity_score?.toFixed(3) ?? '—'}</span>
@@ -169,7 +218,7 @@ export function RunDetail() {
             <div className="flex justify-between text-xs text-slate-500 mb-2">
               <span>Avg Keyword Coverage</span><span className="font-mono text-white">{run.avg_keyword_coverage?.toFixed(3) ?? '—'}</span>
             </div>
-            <ScoreBar value={run.avg_keyword_coverage ?? 0} color="bg-cyan-500" />
+            <ScoreBar value={run.avg_keyword_coverage ?? 0} color="bg-emerald-500" />
           </div>
           {/* Quality gate details */}
           {run.quality_gate_details && (

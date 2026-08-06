@@ -35,6 +35,9 @@ class EvalRun(Base, UUIDMixin, TimestampMixin):
     celery_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Evaluation Target Type (raw_llm vs rag)
+    target_type: Mapped[str] = mapped_column(String(50), nullable=False, default="raw_llm", index=True)
+
     # Dynamic endpoint fields — allow any local/deployed LLM
     endpoint_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     system_prompt_override: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -52,6 +55,11 @@ class EvalRun(Base, UUIDMixin, TimestampMixin):
     p50_latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     p95_latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     total_runtime_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # RAGAS Aggregate Metrics
+    avg_faithfulness: Mapped[float | None] = mapped_column(Float, nullable=True)
+    avg_answer_relevance: Mapped[float | None] = mapped_column(Float, nullable=True)
+    avg_context_precision: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     quality_gate_passed: Mapped[bool | None] = mapped_column(nullable=True)
     quality_gate_details: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

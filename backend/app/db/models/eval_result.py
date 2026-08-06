@@ -34,6 +34,13 @@ class EvalResult(Base, UUIDMixin, TimestampMixin):
     keyword_coverage: Mapped[float | None] = mapped_column(Float, nullable=True)
     gemini_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     gemini_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # RAG Metrics & Context
+    retrieved_contexts: Mapped[dict | list | None] = mapped_column(JSONB, nullable=True)
+    faithfulness: Mapped[float | None] = mapped_column(Float, nullable=True)
+    answer_relevance: Mapped[float | None] = mapped_column(Float, nullable=True)
+    context_precision: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     final_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

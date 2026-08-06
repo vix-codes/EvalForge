@@ -70,9 +70,13 @@ class Settings(BaseSettings):
     GITHUB_WEBHOOK_SECRET: str = ""
     GITHUB_TOKEN: str = ""
 
-    # DockOps Integration
-    DOCKOPS_WEBHOOK_SECRET: str = ""
-
+    # RAG Settings
+    DOCS_DIR: str = "docs"
+    CHROMA_PERSIST_DIR: str = "backend/data/chroma_db"
+    RAG_CHUNK_SIZE: int = 500
+    RAG_CHUNK_OVERLAP: int = 50
+    RAG_TOP_K: int = 3
+    EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
 
     # Quality Gates
     MAX_HALLUCINATION_RATE: float = 0.15

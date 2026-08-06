@@ -39,6 +39,7 @@ export interface EvalRun {
   suite_id: string
   model_name: string
   model_provider: string
+  target_type: string
   status: string
   trigger: string
   commit_sha: string | null
@@ -58,6 +59,9 @@ export interface EvalRun {
   hallucination_rate: number | null
   avg_similarity_score: number | null
   avg_keyword_coverage: number | null
+  avg_faithfulness: number | null
+  avg_answer_relevance: number | null
+  avg_context_precision: number | null
   avg_latency_ms: number | null
   p50_latency_ms: number | null
   p95_latency_ms: number | null
@@ -72,12 +76,16 @@ export interface EvalRunSummary {
   id: string
   suite_id: string
   model_name: string
+  target_type?: string
   status: string
   trigger: string
   endpoint_url?: string | null
   system_prompt_override?: string | null
   pass_rate: number | null
   hallucination_rate: number | null
+  avg_faithfulness?: number | null
+  avg_answer_relevance?: number | null
+  avg_context_precision?: number | null
   p95_latency_ms: number | null
   quality_gate_passed: boolean | null
   created_at: string
@@ -93,6 +101,10 @@ export interface EvalResult {
   keyword_coverage: number | null
   gemini_score: number | null
   gemini_reasoning: string | null
+  retrieved_contexts?: Array<Record<string, unknown>> | null
+  faithfulness?: number | null
+  answer_relevance?: number | null
+  context_precision?: number | null
   final_score: number | null
   passed: boolean
   is_hallucination: boolean
@@ -110,6 +122,9 @@ export interface EvalResultSummary {
   passed: boolean
   is_hallucination: boolean
   final_score: number | null
+  faithfulness?: number | null
+  answer_relevance?: number | null
+  context_precision?: number | null
   latency_ms: number | null
   failure_reason: string | null
 }

@@ -15,6 +15,10 @@ class EvalResultResponse(BaseSchema):
     keyword_coverage: float | None
     gemini_score: float | None
     gemini_reasoning: str | None
+    retrieved_contexts: dict | list | None = None
+    faithfulness: float | None = None
+    answer_relevance: float | None = None
+    context_precision: float | None = None
     final_score: float | None
     passed: bool
     is_hallucination: bool
@@ -32,6 +36,9 @@ class EvalResultSummary(BaseSchema):
     passed: bool
     is_hallucination: bool
     final_score: float | None
+    faithfulness: float | None = None
+    answer_relevance: float | None = None
+    context_precision: float | None = None
     latency_ms: float | None
     failure_reason: str | None
 

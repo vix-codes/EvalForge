@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -68,6 +68,7 @@ class CliConfig:
     gemini_model: str
     poll_interval: float
     pull_model: bool
+    target_type: str = "raw_llm"
 
 
 @app.callback()
@@ -346,13 +347,19 @@ def bulk_ingest_questions(
     return response.json()
 
 
-def trigger_run(client: httpx.Client, suite_id: str, ollama_model: str) -> dict[str, Any]:
+def trigger_run(
+    client: httpx.Client,
+    suite_id: str,
+    ollama_model: str,
+    target_type: str = "raw_llm",
+) -> dict[str, Any]:
     response = client.post(
         "/evals",
         json={
             "suite_id": suite_id,
             "model_name": ollama_model,
             "model_provider": "ollama",
+            "target_type": target_type,
             "trigger": "cli:auto-test",
         },
     )
@@ -462,21 +469,37 @@ def render_report(
 
 
 def metrics_grid(run: dict[str, Any], result_count: int) -> Table:
+    is_rag = run.get("target_type") == "rag" or run.get("avg_faithfulness") is not None
     metrics = Table.grid(expand=True)
-    metrics.add_column(justify="center")
-    metrics.add_column(justify="center")
-    metrics.add_column(justify="center")
-    metrics.add_column(justify="center")
-    metrics.add_row(
-        Panel(str(run.get("total_questions", result_count)), title="Total Questions", border_style="blue"),
-        Panel(pct(run.get("hallucination_rate")), title="Hallucination Rate", border_style="red"),
-        Panel(pct(run.get("pass_rate")), title="Pass Rate", border_style="green"),
-        Panel(latency(run.get("avg_latency_ms")), title="Average Latency", border_style="magenta"),
-    )
+    if is_rag:
+        metrics.add_column(justify="center")
+        metrics.add_column(justify="center")
+        metrics.add_column(justify="center")
+        metrics.add_column(justify="center")
+        metrics.add_column(justify="center")
+        metrics.add_row(
+            Panel(str(run.get("total_questions", result_count)), title="Total Questions", border_style="blue"),
+            Panel(pct(run.get("pass_rate")), title="Pass Rate", border_style="green"),
+            Panel(score(run.get("avg_faithfulness")), title="Faithfulness", border_style="cyan"),
+            Panel(score(run.get("avg_answer_relevance")), title="Relevance", border_style="magenta"),
+            Panel(score(run.get("avg_context_precision")), title="Precision", border_style="yellow"),
+        )
+    else:
+        metrics.add_column(justify="center")
+        metrics.add_column(justify="center")
+        metrics.add_column(justify="center")
+        metrics.add_column(justify="center")
+        metrics.add_row(
+            Panel(str(run.get("total_questions", result_count)), title="Total Questions", border_style="blue"),
+            Panel(pct(run.get("hallucination_rate")), title="Hallucination Rate", border_style="red"),
+            Panel(pct(run.get("pass_rate")), title="Pass Rate", border_style="green"),
+            Panel(latency(run.get("avg_latency_ms")), title="Average Latency", border_style="magenta"),
+        )
     return metrics
 
 
 def results_table(results: list[dict[str, Any]]) -> Table:
+    has_rag = any(r.get("faithfulness") is not None for r in results)
     table = Table(
         title="Detailed Results",
         box=TABLE_BOX,
@@ -485,24 +508,40 @@ def results_table(results: list[dict[str, Any]]) -> Table:
         header_style="bold white",
     )
     table.add_column("Question", ratio=3, overflow="fold")
-    table.add_column("Expected Keywords", ratio=2, overflow="fold")
-    table.add_column("Ollama Answer Snippet", ratio=4, overflow="fold")
-    table.add_column("Similarity", justify="right", no_wrap=True)
-    table.add_column("Keyword", justify="right", no_wrap=True)
-    table.add_column("Gemini Judge", justify="right", no_wrap=True)
+    table.add_column("Model Answer Snippet", ratio=4, overflow="fold")
+    if has_rag:
+        table.add_column("Faithfulness", justify="right", no_wrap=True)
+        table.add_column("Relevance", justify="right", no_wrap=True)
+        table.add_column("Precision", justify="right", no_wrap=True)
+    else:
+        table.add_column("Similarity", justify="right", no_wrap=True)
+        table.add_column("Keyword", justify="right", no_wrap=True)
+        table.add_column("Gemini Judge", justify="right", no_wrap=True)
     table.add_column("Status", justify="center", no_wrap=True)
 
     for result in results:
         question = result.get("question") or {}
-        table.add_row(
-            question.get("question") or f"Question ID: {result.get('question_id', 'unknown')}",
-            question.get("expected_keywords") or "N/A",
-            snippet(result.get("model_response") or result.get("error")),
-            score(result.get("similarity_score")),
-            score(result.get("keyword_coverage")),
-            score(result.get("gemini_score")),
-            status_cell(result),
-        )
+        q_text = question.get("question") or f"Question ID: {result.get('question_id', 'unknown')}"
+        ans_text = snippet(result.get("model_response") or result.get("error"))
+
+        if has_rag:
+            table.add_row(
+                q_text,
+                ans_text,
+                score(result.get("faithfulness")),
+                score(result.get("answer_relevance")),
+                score(result.get("context_precision")),
+                status_cell(result),
+            )
+        else:
+            table.add_row(
+                q_text,
+                ans_text,
+                score(result.get("similarity_score")),
+                score(result.get("keyword_coverage")),
+                score(result.get("gemini_score")),
+                status_cell(result),
+            )
     return table
 
 
@@ -565,8 +604,8 @@ def execute_auto_test(config: CliConfig) -> None:
         console.print(f"[bold cyan]Ingesting {len(generated_questions)} generated questions...[/bold cyan]")
         bulk_ingest_questions(client, suite["id"], generated_questions)
 
-        console.print(f"[bold cyan]Starting Ollama evaluation run for {config.ollama_model}...[/bold cyan]")
-        run = trigger_run(client, suite["id"], config.ollama_model)
+        console.print(f"[bold cyan]Starting Ollama evaluation run ({config.target_type}) for {config.ollama_model}...[/bold cyan]")
+        run = trigger_run(client, suite["id"], config.ollama_model, target_type=config.target_type)
         run = poll_run(client, run["id"], config.poll_interval)
 
         if str(run.get("status", "")).lower() != "completed":
@@ -608,6 +647,12 @@ def auto_test(
         "--gemini-model",
         help=f"Gemini model used once for dataset generation. Defaults to GEMINI_MODEL or {DEFAULT_GEMINI_MODEL}.",
     ),
+    target_type: str = typer.Option(
+        "raw_llm",
+        "--target-type",
+        "-t",
+        help="Evaluation target type: 'raw_llm' or 'rag'.",
+    ),
     poll_interval: float = typer.Option(
         2.0,
         "--poll-interval",
@@ -630,6 +675,7 @@ def auto_test(
         gemini_model=gemini_model or os.getenv("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL,
         poll_interval=poll_interval,
         pull_model=pull_model,
+        target_type=target_type,
     )
 
     try:
